@@ -84,4 +84,3 @@ ax2.grid()
 plt.suptitle('Inversion strength at SLC')
 
 plt.savefig('inversion_strength')
-
