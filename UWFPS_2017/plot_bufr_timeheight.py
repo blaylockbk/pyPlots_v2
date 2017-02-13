@@ -40,6 +40,9 @@ from BB_wx_calcs.humidity import Tempdwpt_to_RH
 
 
 stn = 'kogd'
+stn = 'kpvu'
+#stn = 'kslc'
+
 SAVE = '/uufs/chpc.utah.edu/common/home/u0553130/public_html/PhD/UWFPS_2017/time-height/'
 if not os.path.exists(SAVE):
     os.makedirs(SAVE)
@@ -50,7 +53,7 @@ date_list = np.array([])
 
 while DATE < datetime(2017, 2, 5, 1):
     date_list = np.append(date_list, DATE)
-    # Get the burf sounding for the hour
+    # Get the bufr sounding for the hour
     DIR = '/uufs/chpc.utah.edu/common/home/horel-group/archive/%04d%02d%02d/models/hrrr/' \
         % (DATE.year, DATE.month, DATE.day)
     FILE = '%s_%04d%02d%02d%02d.buf' \
@@ -138,7 +141,7 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
-plt.title(stn + ' HRRR burf soundings: Potential Temperature')
+plt.title(stn.upper() + ' HRRR bufr soundings: Potential Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_theta')
 
@@ -191,7 +194,7 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
-plt.title(stn + ' HRRR burf soundings: Relative Humidity')
+plt.title(stn.upper() + ' HRRR bufr soundings: Relative Humidity')
 
 plt.savefig(SAVE+stn+'_hrrr_RH')
 
@@ -244,7 +247,7 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
-plt.title(stn + ' HRRR burf soundings: Dew Point Temperature')
+plt.title(stn.upper() + ' HRRR bufr soundings: Dew Point Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_dwpt')
 
@@ -297,7 +300,7 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
-plt.title(stn + ' HRRR burf soundings: Temperature')
+plt.title(stn.upper() + ' HRRR bufr soundings: Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_temp')
 
@@ -351,6 +354,6 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
-plt.title(stn + ' HRRR burf soundings: Pressure')
+plt.title(stn.upper() + ' HRRR bufr soundings: Pressure')
 
 plt.savefig(SAVE+stn+'_hrrr_press')
