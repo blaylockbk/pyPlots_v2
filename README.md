@@ -26,7 +26,7 @@ the file name
 
 - **..._MW_...** data from the mesowest API
 - **..._bufr_...** data from bufr soundings (typically HRRR)
-- **..._STNid_** some sort of station identifier
+- **..._STNid_...** some sort of station identifier
 
 ## Saving figures
 Save figures in directories with similar names as the directory and file name
