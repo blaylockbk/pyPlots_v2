@@ -9,13 +9,20 @@ Plot a time height from HRRR Bufr Data
     - Relative Humidity
 """
 
+import sys
+sys.path.append('/uufs/chpc.utah.edu/common/home/u0553130/pyBKB_v2')
+sys.path.append('B:/pyBKB_v2')
+from BB_HRRR.get_bufr_sounding import get_bufr_sounding
+from BB_wx_calcs.thermodynamics import TempPress_to_PotTemp
+from BB_wx_calcs.humidity import Tempdwpt_to_RH
+
 from datetime import datetime, timedelta
+import os
+import numpy as np
+
 import matplotlib.pyplot as plt
 import matplotlib.dates
 from matplotlib.ticker import MultipleLocator
-import numpy as np
-import os
-
 import matplotlib as mpl
 ## Reset the defaults (see more here: http://matplotlib.org/users/customizing.html)
 mpl.rcParams['figure.figsize'] = [12, 4]
@@ -31,36 +38,49 @@ mpl.rcParams['legend.loc'] = 'best'
 mpl.rcParams['savefig.bbox'] = 'tight'
 mpl.rcParams['contour.negative_linestyle'] = 'solid'
 
-import sys
-sys.path.append('/uufs/chpc.utah.edu/common/home/u0553130/pyBKB_v2')
-sys.path.append('B:/pyBKB_v2')
-from BB_HRRR.get_bufr_sounding import get_bufr_sounding
-from BB_wx_calcs.thermodynamics import TempPress_to_PotTemp
-from BB_wx_calcs.humidity import Tempdwpt_to_RH
-
-
-stn = 'kogd'
-stn = 'kpvu'
-#stn = 'kslc'
-
-SAVE = '/uufs/chpc.utah.edu/common/home/u0553130/public_html/PhD/UWFPS_2017/time-height/'
+# ======================================================
+#                Stuff you can change :)
+# ======================================================
+# Save directory
+BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/jan-feb/'
 if not os.path.exists(SAVE):
+    # make the SAVE directory
     os.makedirs(SAVE)
+    # then link the photo viewer
+    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
+    os.link(photo_viewer, SAVE+'photo_viewer.php')
+
+# Station
+#stn = 'kogd'
+#stn = 'kpvu'
+stn = 'kslc'
+
+# start and end date
+DATE = datetime(2017, 1, 1, 0)
+DATEe = datetime(2017, 2, 17, 1)
+
+# ======================================================
+#                        Get data
+# ======================================================
+date_list = np.array([])
+dates_skipped = np.array([])
 
 # Loop for each hour...
-DATE = datetime(2017, 1, 23, 0)
-date_list = np.array([])
+while DATE < DATEe:
+    try:
+        # Get the bufr sounding for the hour
+        b = get_bufr_sounding(DATE, site=stn)
+        date_list = np.append(date_list, DATE)
+    except:
+        print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        print "!  Skipping", DATE, "     !"
+        print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        dates_skipped = np.append(dates_skipped, DATE)
+        DATE += timedelta(hours=1)
+        continue
 
-while DATE < datetime(2017, 2, 5, 1):
-    date_list = np.append(date_list, DATE)
-    # Get the bufr sounding for the hour
-    DIR = '/uufs/chpc.utah.edu/common/home/horel-group/archive/%04d%02d%02d/models/hrrr/' \
-        % (DATE.year, DATE.month, DATE.day)
-    FILE = '%s_%04d%02d%02d%02d.buf' \
-        % (stn, DATE.year, DATE.month, DATE.day, DATE.hour)
-    b = get_bufr_sounding(DATE, site=stn)
-
-    # Note: the zeros index of the bufr array, b, is tha analysis hour.
+    # Note: the zeros index of the bufr array, b, is the analysis hour.
     try:
         # Try to stack the array, if it doens't work then the variable hasn't
         # been created yet.
@@ -75,39 +95,37 @@ while DATE < datetime(2017, 2, 5, 1):
         temps = np.array(b['temp'][0])
         dwpts = np.array(b['dwpt'][0])
 
+    print 'Got it:', DATE
     DATE += timedelta(hours=1)
 
 # Derive a few more variables
 thetas = TempPress_to_PotTemp(temps, press)
 RHs = Tempdwpt_to_RH(temps, dwpts)
 
-# make a grid of the dates for the size of the array
-dates = np.ones_like(heights) * range(np.shape(heights)[1])
-
-# Make the plot, but to trim out the upper level stuff we need to know the
-# index level we should grab.
-max_pres = 600
-idx = np.max(np.argwhere(press>max_pres)[0:, 0])
-
-
-
-#==============================================================================
-# figure for potential temperature
-fig, ax = plt.subplots(1, 1)
 # Because the contour funciton doesn't like dates, need to convert dates
 # to some other happy x axis number. Then the x axis dates can be formatted.
 x = matplotlib.dates.date2num(date_list)
 x2D = x*np.ones_like(heights)
 
-cmesh = plt.pcolormesh(x2D[0:idx, :], heights[0:idx, :], thetas[0:idx, :],
+
+# === Begin Plots ===
+
+#==============================================================================
+#                     Plot: Potential Temperature
+#==============================================================================
+fig, ax = plt.subplots(1, 1)
+
+# Shade with theta
+cmesh = plt.pcolormesh(x2D, heights, thetas,
                        cmap='Spectral_r',
-                       vmax=305, 
+                       vmax=305,
                        vmin=270)
+
+# Contour theta
 levels = np.arange(200, 400, 5)
-conto = plt.contour(x2D[0:idx, :], heights[0:idx, :], thetas[0:idx, :],
+conto = plt.contour(x2D, heights, thetas,
                     colors='k',
                     levels=levels)
-
 
 # Format the dates on the Axis
 date_formatter = matplotlib.dates.DateFormatter('%b-%d\n%Y')
@@ -129,8 +147,8 @@ cb = plt.colorbar(cmesh,
                   extend="both")
 cb.set_label('Potential Temperature (K)')
 
-# Simulate the ground by filling a black area    
-plt.ylim([heights.min()-100, heights[idx-1:, :].min()])
+# Visually simulate the ground by filling a black area at the bottom
+plt.ylim([sfc_height-100, 4000])
 plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
 
 # Make ticks on ground white, otherwise they wont show up
@@ -141,25 +159,26 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
+# Title and save
 plt.title(stn.upper() + ' HRRR bufr soundings: Potential Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_theta')
-
+print 'Plotted theta'
 
 #==============================================================================
-# Now make a plot for RH
+#                      Plot: Relative Humidity
+#==============================================================================
 fig, ax = plt.subplots(1, 1)
-# Because the contour funciton doesn't like dates, need to convert dates
-# to some other happy x axis number. Then the x axis dates can be formatted.
-x = matplotlib.dates.date2num(date_list)
-x2D = x*np.ones_like(heights)
 
-cmesh = plt.pcolormesh(x2D[0:idx, :], heights[0:idx, :], RHs[0:idx, :],
+# Shade by Relative Humidity
+cmesh = plt.pcolormesh(x2D, heights, RHs,
                        cmap='BrBG',
                        vmax=100,
                        vmin=0)
+
+# Contour RH
 levels = np.arange(0, 101, 20)
-conto = plt.contour(x2D[0:idx, :], heights[0:idx, :], RHs[0:idx, :],
+conto = plt.contour(x2D, heights, RHs,
                     colors='k',
                     levels=levels)
 
@@ -183,7 +202,7 @@ cb = plt.colorbar(cmesh,
 cb.set_label('Relative Humidity (%)')
 
 # Simulate the ground by filling a black area
-plt.ylim([heights.min()-100, heights[idx-1:, :].min()])
+plt.ylim([sfc_height-100, 4000])
 plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
 
 # Make ticks on ground white, otherwise they wont show up
@@ -194,24 +213,26 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
+# Title and save
 plt.title(stn.upper() + ' HRRR bufr soundings: Relative Humidity')
 
 plt.savefig(SAVE+stn+'_hrrr_RH')
+print 'Plotted RH'
 
 #==============================================================================
-# Now make a plot for DWPT
+#                         Plot: Dew points
+#==============================================================================
 fig, ax = plt.subplots(1, 1)
-# Because the contour funciton doesn't like dates, need to convert dates
-# to some other happy x axis number. Then the x axis dates can be formatted.
-x = matplotlib.dates.date2num(date_list)
-x2D = x*np.ones_like(heights)
 
-cmesh = plt.pcolormesh(x2D[0:idx, :], heights[0:idx, :], dwpts[0:idx, :],
+# Shade dew points
+cmesh = plt.pcolormesh(x2D, heights, dwpts,
                        cmap='RdYlGn',
                        vmax=0,
                        vmin=-30)
+
+# Contour dew points
 levels = np.arange(-30, 6, 5)
-conto = plt.contour(x2D[0:idx, :], heights[0:idx, :], dwpts[0:idx, :],
+conto = plt.contour(x2D, heights, dwpts,
                     colors='k',
                     levels=levels)
 
@@ -236,7 +257,7 @@ cb = plt.colorbar(cmesh,
 cb.set_label('Dew Point Temperature (C)')
 
 # Simulate the ground by filling a black area
-plt.ylim([heights.min()-100, heights[idx-1:, :].min()])
+plt.ylim([sfc_height-100, 4000])
 plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
 
 # Make ticks on ground white, otherwise they wont show up
@@ -247,24 +268,26 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
+# Title and save
 plt.title(stn.upper() + ' HRRR bufr soundings: Dew Point Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_dwpt')
+print 'Plotted Dew Point'
 
 #==============================================================================
-# Now make a plot for true temperature
+#                          Plot: Temperature
+#==============================================================================
 fig, ax = plt.subplots(1, 1)
-# Because the contour funciton doesn't like dates, need to convert dates
-# to some other happy x axis number. Then the x axis dates can be formatted.
-x = matplotlib.dates.date2num(date_list)
-x2D = x*np.ones_like(heights)
 
-cmesh = plt.pcolormesh(x2D[0:idx, :], heights[0:idx, :], temps[0:idx, :],
+# Shade temperature
+cmesh = plt.pcolormesh(x2D, heights, temps,
                        cmap='Spectral_r',
                        vmax=10,
                        vmin=-30)
+
+# Contour temperature
 levels = np.arange(-30, 11, 5)
-conto = plt.contour(x2D[0:idx, :], heights[0:idx, :], temps[0:idx, :],
+conto = plt.contour(x2D, heights, temps,
                     colors='k',
                     levels=levels)
 
@@ -289,7 +312,7 @@ cb = plt.colorbar(cmesh,
 cb.set_label('Temperature (C)')
 
 # Simulate the ground by filling a black area
-plt.ylim([heights.min()-100, heights[idx-1:, :].min()])
+plt.ylim([sfc_height-100, 4000])
 plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
 
 # Make ticks on ground white, otherwise they wont show up
@@ -300,24 +323,26 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
+# Title and save
 plt.title(stn.upper() + ' HRRR bufr soundings: Temperature')
 
 plt.savefig(SAVE+stn+'_hrrr_temp')
+print 'Plotted Temperature'
 
 #==============================================================================
-# Now make a plot height of pressure levels
+#                            Plot: Pressure
+#==============================================================================
 fig, ax = plt.subplots(1, 1)
-# Because the contour funciton doesn't like dates, need to convert dates
-# to some other happy x axis number. Then the x axis dates can be formatted.
-x = matplotlib.dates.date2num(date_list)
-x2D = x*np.ones_like(heights)
 
-cmesh = plt.pcolormesh(x2D[0:idx, :], heights[0:idx, :], press[0:idx, :],
+# Shade pressure
+cmesh = plt.pcolormesh(x2D, heights, press,
                        cmap='Blues',
                        vmax=900,
                        vmin=600)
+
+# Contour pressure 
 levels = np.arange(600, 901, 50)
-CS = plt.contour(x2D[0:idx, :], heights[0:idx, :], press[0:idx, :],
+CS = plt.contour(x2D, heights, press,
                     colors='k',
                     levels=levels)
 plt.clabel(CS, inline=1, fontsize=10)
@@ -343,7 +368,7 @@ cb = plt.colorbar(cmesh,
 cb.set_label('Pressure (hPa)')
 
 # Simulate the ground by filling a black area
-plt.ylim([heights.min()-100, heights[idx-1:, :].min()])
+plt.ylim([sfc_height-100, 4000])
 plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
 
 # Make ticks on ground white, otherwise they wont show up
@@ -354,6 +379,8 @@ ax.tick_params(axis='x', which='minor', color='w', top=False)
 ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
+# Title and save
 plt.title(stn.upper() + ' HRRR bufr soundings: Pressure')
 
 plt.savefig(SAVE+stn+'_hrrr_press')
+print 'Plotted Pressure'
