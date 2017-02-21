@@ -40,16 +40,6 @@ mpl.rcParams['contour.negative_linestyle'] = 'solid'
 # ======================================================
 #                Stuff you can change :)
 # ======================================================
-# Save directory
-BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/CAPE/jan-feb/'
-if not os.path.exists(SAVE):
-    # make the SAVE directory
-    os.makedirs(SAVE)
-    # then link the photo viewer
-    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
-    os.link(photo_viewer, SAVE+'photo_viewer.php')
-
 # bufr station ID
 stn = 'kslc'
 
@@ -60,17 +50,29 @@ DATE = datetime(2017, 1, 1, 0)
 DATEe = datetime(2017, 2, 17, 0)
 
 # meters to raise a parcel (find level nearest this increase)
-target_rise = 700
+target_rise =700
 
 # HRRR bufr forcast hour
-fxx = 0
+fxx = 6
 
 # top layer you want (you don't really need to get all 50 layers, now do you)
 top_layer = 15
 
+# Save directory
+BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/CAPE/jan-feb/f%02d/' % (fxx)
+if not os.path.exists(SAVE):
+    # make the SAVE directory
+    os.makedirs(SAVE)
+    # then link the photo viewer
+    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
+    os.link(photo_viewer, SAVE+'photo_viewer.php')
+
 # ======================================================
 #       Get data and store for each HRRR hour
 # ======================================================
+# Adjust date by the forecast hour to get the valid date.
+DATE = DATE - timedelta(hours=fxx)
 date_list = np.array([])
 dates_skipped = np.array([])
 
@@ -123,7 +125,7 @@ while DATE < DATEe:
         hght = data['bufr']['hght']
         pres = data['bufr']['pres']
 
-    print 'Got it:', DATE
+    print 'Got it: forecast f%02d' % (fxx), 'valid', DATE
     DATE += timedelta(hours=1)
 
 # mask out any nan values that prevent plotting with pcolormesh
@@ -209,64 +211,72 @@ for i in layer.keys():
     plt.figure()
     # The number of levels to sum is dependent on the height.
     # Determine approximatly how many layers up gives the target_rise increase.
-    hgt_diff = layer[i]['hght'][:, 0][i:] - layer[i]['hght'][:, 0][i]
-    closest_rise = np.argmin(np.abs(hgt_diff-target_rise))
-    hgt_increase = hgt_diff[closest_rise]
+    # NOTE: I normalize the CAPE of each lifted parcel each hour by dividing by
+    #       the number of meters it rises.
+    # The parcel on the ith level is raised to almost the target height.
+    # The total CAPE is calculated for that parcel at the new height, and
+    # is then normalized by dividing by how many meters it rose. The units
+    # are given as J kg-l m-1 (aka, CAPE/meter)
+    hgt_diff = np.array([layer[i]['hght'][:, profile][i:] - layer[i]['hght'][:, profile][i] for profile in range(len(date_list))])
+    closest_rise = np.array([np.argmin(np.abs(hd-target_rise)) for hd in hgt_diff])
+    hgt_increase = np.array([hgt_diff[j][closest_rise[j]] for j in range(len(closest_rise))])
 
-    sum_CAPE_layers = np.sum(layer[i]['CAPE'].data[i:i+closest_rise+1], axis=0)
+    sum_CAPE_layers = [np.sum(layer[i]['CAPE'].data[:,j][i:i+closest_rise[j]+1]) for j in range(len(closest_rise))]
+    norm_CAPE_layers = sum_CAPE_layers/hgt_increase # New Units: J kg-1 m-1
     sum_hgt_layers = layer[i]['hght'][i]
 
     # Save the sum_CAPE_layers array
     try:
         # Try to stack the array, if it doens't work then the variable hasn't
         # been created yet.
-        sum_CAPE = np.vstack([sum_CAPE_layers, sum_CAPE])
+        norm_CAPE = np.vstack([norm_CAPE_layers, norm_CAPE])
         sum_hgt = np.vstack([sum_hgt_layers, sum_hgt])
     except:
         # It looks like the variable hasn't been created yet, so create it.
-        sum_CAPE = sum_CAPE_layers
+        norm_CAPE = norm_CAPE_layers
         sum_hgt = sum_hgt_layers
 
+
     # Sum Energy
-    plt.plot(date_list, sum_CAPE_layers,
+    plt.plot(date_list, norm_CAPE_layers,
              color="k",
-             lw='3')
+             lw='2')
 
     # Zero energy line to spearate positive and negative area visually
     plt.axhline(y=0, ls='--', lw=2, color='grey')
 
     # Share the area between
-    plt.fill_between(date_list, np.zeros(len(sum_CAPE_layers)), sum_CAPE_layers,
-                     where=sum_CAPE_layers >= np.zeros(len(sum_CAPE_layers)),
+    plt.fill_between(date_list, np.zeros(len(norm_CAPE_layers)), norm_CAPE_layers,
+                     where=norm_CAPE_layers >= np.zeros(len(norm_CAPE_layers)),
                      facecolor='orange',
                      alpha=.5,
                      interpolate=True)
-    plt.fill_between(date_list, np.zeros(len(sum_CAPE_layers)), sum_CAPE_layers,
-                     where=sum_CAPE_layers <= np.zeros(len(sum_CAPE_layers)),
+    plt.fill_between(date_list, np.zeros(len(norm_CAPE_layers)), norm_CAPE_layers,
+                     where=norm_CAPE_layers <= np.zeros(len(norm_CAPE_layers)),
                      facecolor='mediumpurple',
                      alpha=.5,
                      interpolate=True)
 
     # Labels and save
-    plt.ylabel(r'Energy (J kg$\mathregular{^{-1}}$)')
-    plt.title('Energy of level %2d parcel when lifted %.1f  m (target rise: %d)' \
-              % (i, hgt_increase, target_rise))
-    plt.ylim([-400, 200])
+    plt.ylabel(r'Normalized Energy (J kg$\mathregular{^{-1}}$ m$\mathregular{^{-1}}$)')
+    plt.title('Normalized Energy of level %2d parcel when lifted %.1f  m (target rise: %d)' \
+              % (i, hgt_increase[0], target_rise))
+    plt.ylim([-.6, .3])
 
     plt.savefig(SAVE+stn+'_hrrr_lvl_%02d_engergy_rise_%dm' % (i, target_rise))
     plt.close()
     print 'plotted: parcel level', i
 
 #==============================================================================
-#            Plot: Total energy of parcels lifted to target level
+#       Plot: Total normalized energy of parcels lifted to target level
 #==============================================================================
 fig, ax = plt.subplots(1, 1)
 
 # Shaded energy
-cmesh = plt.pcolormesh(date_list, sum_hgt, sum_CAPE,
+cmesh = plt.pcolormesh(date_list, sum_hgt, norm_CAPE,
                        cmap='PuOr_r',
-                       vmax=200,
-                       vmin=-200)
+                       vmax=.4,
+                       vmin=-.4)
 
 # Potential temperature contours
 levels = np.arange(200, 400, 5)
@@ -290,9 +300,9 @@ cb = plt.colorbar(cmesh,
                   orientation='vertical',
                   shrink=.7,
                   pad=.02,
-                  ticks=range(-200, 201, 50),
+                  ticks=np.arange(-.4, .5, .1),
                   extend="both")
-cb.set_label('Total Energy (J kg$\mathregular{^{-1}}$)')
+cb.set_label(r'Normalized Total Energy (J kg$\mathregular{^{-1}}$ m$\mathregular{^{-1}}$)')
 
 # Visually simulate the ground by filling a black area at the bottom
 plt.ylim([sfc_height-100, 4000])
@@ -307,9 +317,69 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: parcel energy when lifted %d m' % (target_rise))
+plt.title(stn.upper() + ' HRRR bufr soundings: parcel normalized energy when lifted approx. %d m' % (target_rise))
 
 plt.savefig(SAVE+stn+'_hrrr_energyLift_%dm' % target_rise)
+plt.close()
+
+#==============================================================================
+#  Plot: Total normalized energy of parcels lifted to target level (contourf)
+#==============================================================================
+x2D_special = x*np.ones_like(norm_CAPE)
+fig, ax = plt.subplots(1, 1)
+
+# Shaded energy
+levels = np.arange(-.4,.5,.1)
+contf = plt.contourf(x2D_special, sum_hgt, norm_CAPE,
+                     cmap='PuOr_r',
+                     vmax=.4,
+                     vmin=-.4,
+                     levels=levels,
+                     extend='both')
+
+# Potential temperature contours
+levels = np.arange(200, 400, 5)
+conto = plt.contour(x2D, hght, theta,
+                    colors='k',
+                    linewidths=.75,
+                    levels=levels)
+
+# Format the dates on the Axis
+date_formatter = matplotlib.dates.DateFormatter('%b-%d\n%Y')
+ax.xaxis.set_major_formatter(date_formatter)
+
+# Label y axis starting with the surface tick
+sfc_height = hght.min()
+yticks = range(1000, 5000, 500)
+yticks.extend([sfc_height])
+plt.yticks(yticks)
+plt.ylabel('Height (m)')
+
+# colorbar
+cb = plt.colorbar(contf,
+                  orientation='vertical',
+                  shrink=.7,
+                  pad=.02,
+                  ticks=np.arange(-.4, .5, .1),
+                  extend="both")
+cb.set_label(r'Normalized Total Energy (J kg$\mathregular{^{-1}}$ m$\mathregular{^{-1}}$)')
+
+# Visually simulate the ground by filling a black area at the bottom
+plt.ylim([sfc_height-100, 4000])
+plt.fill_between([date_list[0], date_list[-1]], sfc_height, color="black")
+
+# Make ticks on ground white, otherwise they wont show up on black
+ax.xaxis.set_minor_locator(MultipleLocator(1))
+ax.yaxis.set_minor_locator(MultipleLocator(100))
+ax.tick_params(axis='x', which='major', color='w', top=False)
+ax.tick_params(axis='x', which='minor', color='w', top=False)
+ax.tick_params(axis='y', which='major', color='k')
+ax.tick_params(axis='y', which='minor', color='k')
+
+# Title and save
+plt.title(stn.upper() + ' HRRR bufr soundings: parcel normalized energy when lifted approx. %d m' % (target_rise))
+
+plt.savefig(SAVE+stn+'_hrrr_energyLift_%dm_contourf' % target_rise)
 plt.close()
 
 #==============================================================================
