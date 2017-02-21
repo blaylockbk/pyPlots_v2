@@ -103,15 +103,15 @@ for t in np.arange(startplot_index,int(np.shape(nc.variables['Times'])[0])):
     TTH = TH+300                          # Total Potential Temperature (theta) [K]
     
     # Plume Data
-    N_SLV = nc.variables['N_SLV'][t][:,lat,lon]
-    N_SLV_l = nc.variables['N_SLV'][t][:,lat,lon-1]
-    N_SLV_r = nc.variables['N_SLV'][t][:,lat,lon+1] 
+    N_SLV = nc.variables['N_SLV'][t][:,lat,lon]     # cross-section
+    N_SLV_l = nc.variables['N_SLV'][t][:,lat,lon-1] # cross-section one grid left (west)
+    N_SLV_r = nc.variables['N_SLV'][t][:,lat,lon+1] # cross-section one grid right (east)
     S_SLV = nc.variables['S_SLV'][t][:,lat,lon]
     S_SLV_l = nc.variables['S_SLV'][t][:,lat,lon-1]
     S_SLV_r = nc.variables['S_SLV'][t][:,lat,lon+1]  
     
     # add up the tracer slices (this one is three km thick)
-    N_SLV = N_SLV+N_SLV_l+N_SLV_r    
+    N_SLV = N_SLV+N_SLV_l+N_SLV_r    # results in a three km wide cross section
     S_SLV = S_SLV+S_SLV_l+S_SLV_r        
     
     # PH and TH are plotted on different levels:
