@@ -47,20 +47,20 @@ stn = 'kslc'
 #DATE = datetime(2017, 1, 23, 0)
 #DATEe = datetime(2017, 2, 5, 1)
 DATE = datetime(2017, 1, 1, 0)
-DATEe = datetime(2017, 2, 17, 0)
+eDATE = datetime(2017, 2, 17, 0)
 
 # meters to raise a parcel (find level nearest this increase)
 target_rise =700
 
 # HRRR bufr forcast hour
-fxx = 6
+fxx = 18
 
 # top layer you want (you don't really need to get all 50 layers, now do you)
 top_layer = 15
 
 # Save directory
 BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/CAPE/jan-feb/f%02d/' % (fxx)
+SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/jan-feb/CAPE/f%02d/' % (fxx)
 if not os.path.exists(SAVE):
     # make the SAVE directory
     os.makedirs(SAVE)
@@ -73,18 +73,20 @@ if not os.path.exists(SAVE):
 # ======================================================
 # Adjust date by the forecast hour to get the valid date.
 DATE = DATE - timedelta(hours=fxx)
+eDATE = eDATE - timedelta(hours=fxx)
 date_list = np.array([])
 dates_skipped = np.array([])
 
 # initialize a dictionary to store calculations from each layer
 layer = {} # to clarify, I call bufr points levels, and mean CAPE points layers
 
-while DATE < DATEe:
+while DATE < eDATE:
     # Loop for each hour...
     try:
         # Get the CAPE and hght from the bufr data for the hour
         data = LCL_and_Parcels_from_bufr(DATE, fxx=fxx)
-        date_list = np.append(date_list, DATE)
+        VALID_DATE = DATE + timedelta(hours=fxx)
+        date_list = np.append(date_list, VALID_DATE)
 
     except:
         print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"

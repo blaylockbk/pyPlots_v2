@@ -41,16 +41,6 @@ mpl.rcParams['contour.negative_linestyle'] = 'solid'
 # ======================================================
 #                Stuff you can change :)
 # ======================================================
-# Save directory
-BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/jan-feb/'
-if not os.path.exists(SAVE):
-    # make the SAVE directory
-    os.makedirs(SAVE)
-    # then link the photo viewer
-    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
-    os.link(photo_viewer, SAVE+'photo_viewer.php')
-
 # Station
 #stn = 'kogd'
 #stn = 'kpvu'
@@ -58,20 +48,38 @@ stn = 'kslc'
 
 # start and end date
 DATE = datetime(2017, 1, 1, 0)
-DATEe = datetime(2017, 2, 17, 1)
+eDATE = datetime(2017, 2, 17, 0)
+
+# Forecast hour
+fxx = 0
+
+# Save directory
+BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+SAVE = BASE + 'public_html/PhD/UWFPS_2017/time-height/jan-feb/f%02d/' % (fxx)
+if not os.path.exists(SAVE):
+    # make the SAVE directory
+    os.makedirs(SAVE)
+    # then link the photo viewer
+    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
+    os.link(photo_viewer, SAVE+'photo_viewer.php')
 
 # ======================================================
 #                        Get data
 # ======================================================
+# Adjust date by the forecase hour to get the valid date
+DATE = DATE - timedelta(hours=fxx)
+eDATE = eDATE - timedelta(hours=fxx)
+
 date_list = np.array([])
 dates_skipped = np.array([])
 
 # Loop for each hour...
-while DATE < DATEe:
+while DATE < eDATE:
     try:
         # Get the bufr sounding for the hour
         b = get_bufr_sounding(DATE, site=stn)
-        date_list = np.append(date_list, DATE)
+        VALID_DATE = DATE + timedelta(hours=fxx)
+        date_list = np.append(date_list, VALID_DATE)
     except:
         print "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
         print "!  Skipping", DATE, "     !"
@@ -84,23 +92,27 @@ while DATE < DATEe:
     try:
         # Try to stack the array, if it doens't work then the variable hasn't
         # been created yet.
-        heights = np.column_stack([heights, b['hght'][0]])
-        press = np.column_stack([press, b['pres'][0]])
-        temps = np.column_stack([temps, b['temp'][0]])
-        dwpts = np.column_stack([dwpts, b['dwpt'][0]])
+        heights = np.column_stack([heights, b['hght'][fxx]])
+        press = np.column_stack([press, b['pres'][fxx]])
+        temps = np.column_stack([temps, b['temp'][fxx]])
+        dwpts = np.column_stack([dwpts, b['dwpt'][fxx]])
     except:
         # It looks like the variable hasn't been created yet, so create it.
-        heights = np.array(b['hght'][0])
-        press = np.array(b['pres'][0])
-        temps = np.array(b['temp'][0])
-        dwpts = np.array(b['dwpt'][0])
+        heights = np.array(b['hght'][fxx])
+        press = np.array(b['pres'][fxx])
+        temps = np.array(b['temp'][fxx])
+        dwpts = np.array(b['dwpt'][fxx])
 
-    print 'Got it:', DATE
+    print 'Got it: f%02d' % (fxx), DATE
     DATE += timedelta(hours=1)
 
 # Derive a few more variables
 thetas = TempPress_to_PotTemp(temps, press)
 RHs = Tempdwpt_to_RH(temps, dwpts)
+
+# Calculate difference between potental temperture of columns and surface theta
+sfcThetas = thetas[0]
+diffThetas = thetas-sfcThetas
 
 # Because the contour funciton doesn't like dates, need to convert dates
 # to some other happy x axis number. Then the x axis dates can be formatted.
@@ -160,7 +172,7 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: Potential Temperature')
+plt.title(stn.upper() + ' f%02d HRRR bufr soundings: Potential Temperature' % (fxx))
 
 plt.savefig(SAVE+stn+'_hrrr_theta')
 print 'Plotted theta'
@@ -214,7 +226,7 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: Relative Humidity')
+plt.title(stn.upper() + '  f%02d HRRR bufr soundings: Relative Humidity' % (fxx))
 
 plt.savefig(SAVE+stn+'_hrrr_RH')
 print 'Plotted RH'
@@ -269,7 +281,7 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: Dew Point Temperature')
+plt.title(stn.upper() + '  f%02d HRRR bufr soundings: Dew Point Temperature' % (fxx))
 
 plt.savefig(SAVE+stn+'_hrrr_dwpt')
 print 'Plotted Dew Point'
@@ -324,7 +336,7 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: Temperature')
+plt.title(stn.upper() + '  f%02d HRRR bufr soundings: Temperature' % (fxx))
 
 plt.savefig(SAVE+stn+'_hrrr_temp')
 print 'Plotted Temperature'
@@ -380,7 +392,62 @@ ax.tick_params(axis='y', which='major', color='k')
 ax.tick_params(axis='y', which='minor', color='k')
 
 # Title and save
-plt.title(stn.upper() + ' HRRR bufr soundings: Pressure')
+plt.title(stn.upper() + '  f%02d HRRR bufr soundings: Pressure' % (fxx))
 
 plt.savefig(SAVE+stn+'_hrrr_press')
 print 'Plotted Pressure'
+
+#==============================================================================
+#        Plot: Potential Temperature Difference (from surface theta)
+#==============================================================================
+fig, ax = plt.subplots(1, 1)
+
+# Shade with theta
+cmesh = plt.pcolormesh(x2D, heights, diffThetas,
+                       cmap='Reds',
+                       vmax=30,
+                       vmin=0)
+
+# Contour theta
+levels = np.arange(200, 400, 5)
+conto = plt.contour(x2D, heights, thetas,
+                    colors='k',
+                    levels=levels)
+
+# Format the dates on the Axis
+date_formatter = matplotlib.dates.DateFormatter('%b-%d\n%Y')
+ax.xaxis.set_major_formatter(date_formatter)
+
+# Label y axis starting with the surface tick
+sfc_height = heights.min()
+yticks = range(1000,5000, 500)
+yticks.extend([sfc_height])
+plt.yticks(yticks)
+plt.ylabel('Height (m)')
+
+# colorbar
+cb = plt.colorbar(cmesh,
+                  orientation='vertical',
+                  shrink=.7,
+                  pad=.02,
+                  ticks=range(0, 30, 5),
+                  extend="both")
+cb.set_label('Potential Temperature (K)')
+
+# Visually simulate the ground by filling a black area at the bottom
+plt.ylim([sfc_height-100, 4000])
+plt.fill_between([date_list[0], date_list[-1]], np.min(heights), color="black")
+
+# Make ticks on ground white, otherwise they wont show up
+ax.xaxis.set_minor_locator(MultipleLocator(1))
+ax.yaxis.set_minor_locator(MultipleLocator(100))
+ax.tick_params(axis='x', which='major', color='w', top=False)
+ax.tick_params(axis='x', which='minor', color='w', top=False)
+ax.tick_params(axis='y', which='major', color='k')
+ax.tick_params(axis='y', which='minor', color='k')
+
+# Title and save
+plt.title(stn.upper() + '  f%02d HRRR bufr soundings: Potential Temperature Difference from Surface' % (fxx))
+
+plt.savefig(SAVE+stn+'_hrrr_theta-diff')
+print 'Plotted theta-diff'
