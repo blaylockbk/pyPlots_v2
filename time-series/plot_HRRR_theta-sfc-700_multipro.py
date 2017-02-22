@@ -116,6 +116,10 @@ def get_theta_from_grb(DATE):
 
     # Return the values
     print "Got it:", DATE
+    
+    # close the grib file
+    grbs.close() 
+    
     return [VALID_DATE, stn_theta_sfc, stn_theta_700]
 
 if __name__ == "__main__":
