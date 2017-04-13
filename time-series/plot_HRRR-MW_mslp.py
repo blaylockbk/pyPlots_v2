@@ -1,12 +1,12 @@
 # Brian Blaylock
-# April 12, 2017                                              Back from Boston
+# April 12, 2017                                               Back from Boston
 
 """
 Plot comparision of MesoWest observed sea level pressure and 
 HRRR sea level pressure (from HRRR S3 archive).
 """
 
-
+import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
@@ -33,9 +33,9 @@ from BB_downloads.HRRR_S3 import *
 from BB_MesoWest.MesoWest_timeseries import get_mesowest_ts
 from BB_cmap.my_cmap import cmap_gust
 
-# Save directory
+# === Save directory ==========================================================
 BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/timeseries/'
+SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/timeseries_mslp/'
 if not os.path.exists(SAVE):
     # make the SAVE directory
     os.makedirs(SAVE)
@@ -43,31 +43,35 @@ if not os.path.exists(SAVE):
     photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
     os.link(photo_viewer, SAVE+'photo_viewer.php')
 
-# === Stuff you may want to change ========================================
+# === Stuff you may want to change ============================================
 # Date range
 DATE = datetime(2017, 4, 4, 0)
 eDATE = datetime(2017, 4, 7, 0)
 
-# MesoWest Station for Time series
+# MesoWest stations for time series
 stations = ['p43ax', 'q44bx', 'o44ax', 'KSTL', 'KSUS', 'KSPI', 'E0975', 'E0126']
 
-# Forecast Hour
+# Forecast hours
 forecasts = [0, 6, 12, 16, 18]
 
-# =========================================================================
+# =============================================================================
+# =============================================================================
 
+# Create the hourly date list
 base = DATE
 hours = (eDATE-DATE).days * 24
 date_list = [base + timedelta(hours=x) for x in range(0, hours)]
 
+# Create time series plot overlaying HRRR and MesoWest data for each station
+# and each forecast hour.
 for stn in stations:
     for fxx in forecasts:
-
-        # Create pressure time series plot for HRRR and MesoWest:
         # Get MesoWest data
         a = get_mesowest_ts(stn, DATE, eDATE)
 
-        validDate, value = point_hrrr_time_series(DATE, eDATE, variable='MSLMA:mean sea level',
+        # Get HRRR data
+        Hvar = 'MSLMA:mean sea level'
+        validDate, value = point_hrrr_time_series(DATE, eDATE, variable=Hvar,
                                                   lat=a['LAT'], lon=a['LON'],
                                                   fxx=fxx, model='hrrr', field='sfc',
                                                   reduce_CPUs=0)
@@ -83,6 +87,7 @@ for stn in stations:
         else:
             plt.plot(a['DATETIME'], a['sea_level_pressure']/100, c='r', lw=2, label=stn)
 
+        # Figure Cosmetics
         plt.title('Mean sea level pressure at %s (f%02d)' % (stn, fxx))
         plt.ylabel('Pressure (hPa)')
         #ax.set_yticks(range(976, 1041, 4)[0::2])

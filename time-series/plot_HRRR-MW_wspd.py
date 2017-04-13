@@ -1,12 +1,12 @@
 # Brian Blaylock
-# April 12, 2017                                              Back from Boston
+# April 13, 2017                 Utah Jazz finally going to the playoffs again!
 
 """
-Plot comparision of MesoWest observed sea level pressure and 
-HRRR sea level pressure (from HRRR S3 archive).
+Plot comparision of MesoWest observed wind speed and 
+HRRR maximum hourly 10 m wind speed (from HRRR S3 archive).
 """
 
-
+import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
@@ -33,7 +33,7 @@ from BB_downloads.HRRR_S3 import *
 from BB_MesoWest.MesoWest_timeseries import get_mesowest_ts
 from BB_cmap.my_cmap import cmap_gust
 
-# Save directory
+# === Save directory ==========================================================
 BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
 SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/timeseries_wspd/'
 if not os.path.exists(SAVE):
@@ -43,31 +43,34 @@ if not os.path.exists(SAVE):
     photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
     os.link(photo_viewer, SAVE+'photo_viewer.php')
 
-# === Stuff you may want to change ========================================
+# === Stuff you may want to change ============================================
 # Date range
 DATE = datetime(2017, 4, 4, 0)
 eDATE = datetime(2017, 4, 7, 0)
 
-# MesoWest Station for Time series
+# MesoWest stations for time series
 stations = ['KSTL', 'KSUS', 'KSPI', 'E0975', 'E0126']
 
-# Forecast Hour
+# Forecast Hours
 forecasts = [0, 6, 12, 16, 18]
 
-# =========================================================================
+# =============================================================================
+# =============================================================================
 
+# Create the hourly date list
 base = DATE
 hours = (eDATE-DATE).days * 24
 date_list = [base + timedelta(hours=x) for x in range(0, hours)]
 
+# Create time series plot overlaying HRRR and MesoWest data for each station
+# and each forecast hour.
 for stn in stations:
     for fxx in forecasts:
-
-        # Create pressure time series plot for HRRR and MesoWest:
         # Get MesoWest data
         a = get_mesowest_ts(stn, DATE, eDATE)
 
-        Hvar = 'WIND:10 m above '
+        # Get HRRR data
+        Hvar = 'WIND:10 m above'
         validDate, value = point_hrrr_time_series(DATE, eDATE, variable=Hvar,
                                                   lat=a['LAT'], lon=a['LON'],
                                                   fxx=fxx, model='hrrr', field='sfc',
@@ -76,11 +79,12 @@ for stn in stations:
         fig, ax = plt.subplots(1)
 
         # Plot the HRRR data
-        plt.plot(validDate, value, c='k', lw=2, label="HRRR") # convert Pa to hPa
+        plt.plot(validDate, value, c='k', lw=2, label="HRRR")
 
         # Plot the MesoWest data
         plt.plot(a['DATETIME'], a['wind_speed'], c='r', lw=2, label=stn)
 
+        # Figure Cosmetics
         plt.title('Wind Speed at %s (f%02d)' % (stn, fxx))
         plt.ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
         ax.set_xlim([date_list[0], date_list[-1]])
