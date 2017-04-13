@@ -45,13 +45,15 @@ if not os.path.exists(SAVE):
 #m = draw_CONUS_HRRR_map()
 m = draw_midwest_map()
 
-def plot_gust(DATE):
+def plot_gust(inputs):
     """
     Plots surface gusts with the MSLP countours
     """
+    fxx = inputs[0]
+    DATE = inputs[1]
+
     # Get the surface gust (10-m)
     VAR = 'GUST:surface' # Surface Gust
-    fxx = 16
     H = get_hrrr_variable(DATE, VAR, fxx=fxx)
 
     # Get the mean sea level pressure
@@ -86,8 +88,8 @@ def plot_gust(DATE):
     else:
         plt.title('HRRR f%02d %s Valid: %s' % (fxx, VAR, H['valid']))
 
-    savedate = H['valid'].strftime('%Y-%m-%d_%H%M')
-    plt.savefig(SAVE+savedate, bbox_inches="tight", dpi=300)
+    savedate = H['valid'].strftime('valid_%Y-%m-%d_%H%M')
+    plt.savefig(SAVE+savedate+'_f%02d' % (fxx), bbox_inches="tight", dpi=300)
     print 'saved', savedate
 
 
@@ -103,11 +105,14 @@ if __name__ == "__main__":
     # MesoWest Station for Time series
     stn = 'KSTL'
 
+    # Forecast Hour
+    fxx = 0
+
     # =========================================================================
 
     base = DATE
     hours = (eDATE-DATE).days * 24
-    date_list = [base + timedelta(hours=x) for x in range(0, hours)]
+    date_list = [[fxx, base + timedelta(hours=x)] for x in range(0, hours)]
 
     num_proc = multiprocessing.cpu_count() # use all processors
     p = multiprocessing.Pool(num_proc)
@@ -119,27 +124,4 @@ if __name__ == "__main__":
     total_time = datetime.now() - timer1
     print ""
     print 'total time:', total_time, 'with', num_proc, 'processors.'
-
-    # Create pressure time series plot for HRRR and MesoWest:
-    # Get MesoWest data
-    a = get_mesowest_ts(stn, DATE, eDATE)
-
-    date, data = point_hrrr_time_series(DATE, eDATE, variable='MSLMA:mean sea level',
-                                        lat=a['LAT'], lon=a['LON'],
-                                        fxx=0, model='hrrr', field='sfc',
-                                        reduce_CPUs=0)
-
-    fig, ax = plt.subplots(1)
-    plt.plot(date, data/100, c='k', lw=2, label="HRRR") # convert Pa to hPa
-    plt.plot(a['DATETIME'], a['sea_level_pressure']/100, c='r', lw=2, label=stn)
-    plt.title('MSLMA:mean sea level at %s' % stn)
-    plt.ylabel('Pressure (hPa)')
-    ax.set_yticks(range(976, 1041, 4)[0::2])
-    plt.legend()
-    plt.grid()
-    ax.xaxis.set_major_locator(mdates.HourLocator([0, 12]))
-    ax.xaxis.set_minor_locator(mdates.HourLocator(range(0, 24, 3)))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%H:%M'))
-    plt.savefig(SAVE+stn+'_timeseries.png')
-    plt.show(block=False)
 
