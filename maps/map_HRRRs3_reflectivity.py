@@ -4,7 +4,7 @@
 """
 Plot a map of mean sea level pressure from the HRRR model
 """
-
+from numpy import ma
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
@@ -29,17 +29,7 @@ sys.path.append('B:\pyBKB_v2')
 from BB_basemap.draw_maps import *
 from BB_downloads.HRRR_S3 import *
 from BB_MesoWest.MesoWest_timeseries import get_mesowest_ts
-from BB_cmap.my_cmap import cmap_gust
-
-# Save directory
-BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/'
-if not os.path.exists(SAVE):
-    # make the SAVE directory
-    os.makedirs(SAVE)
-    # then link the photo viewer
-    photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
-    os.link(photo_viewer, SAVE+'photo_viewer.php')
+from MetPy_BB.plots import ctables
 
 # Get the map object
 #m = draw_CONUS_HRRR_map()
@@ -52,8 +42,8 @@ def plot_gust(inputs):
     fxx = inputs[0]
     DATE = inputs[1]
 
-    # Get the surface gust (10-m)
-    VAR = 'GUST:surface' # Surface Gust
+    # Get the composite reflectivity
+    VAR = 'REFC:entire atmosphere'
     H = get_hrrr_variable(DATE, VAR, fxx=fxx)
 
     # Get the mean sea level pressure
@@ -65,18 +55,23 @@ def plot_gust(inputs):
     fig.add_subplot(111)
 
     x, y = m(H['lon'], H['lat'])
-    gust = H['value'] # in m/s
+    ref = H['value'] # in dBZ
+
+    ref = ma.array(ref)
+    ref[ref==-10] = ma.masked
+
     m.drawstates()
     m.drawcoastlines()
     m.drawcountries()
-
-    m.pcolormesh(x, y, gust, cmap=cmap_gust(), vmin=0, vmax=35)
+    
+    ctable = 'NWSReflectivity'
+    norm, cmap = ctables.registry.get_with_steps(ctable, -0, 5)
+    m.pcolormesh(x, y, ref, norm=norm, cmap=cmap)
     cb = plt.colorbar(orientation='horizontal',
                       shrink=.9,
-                      pad=.03,
-                      extend="max")
+                      pad=.03)
 
-    cb.set_label(r'10 m Wind Gust (ms$\mathregular{^{-1}}$)')
+    cb.set_label(r'Simulated Composite Reflectivity (dBZ)')
 
     # MSLP Countours
     levels = np.arange(960, 1100, 4)
@@ -90,7 +85,7 @@ def plot_gust(inputs):
 
     savedate = H['valid'].strftime('valid_%Y-%m-%d_%H%M')
     plt.savefig(SAVE+savedate+'_f%02d' % (fxx), bbox_inches="tight", dpi=300)
-    print 'saved', SAVE+savedate
+    print 'saved', SAVE+savedate+'_f%02d' % (fxx)
 
 
 if __name__ == "__main__":
@@ -103,11 +98,13 @@ if __name__ == "__main__":
     eDATE = datetime(2017, 4, 6, 0)
 
     # Forecast Hour
-    fxx = 16
+    fxx = 0
+
+    # =========================================================================
 
     # Save directory
     BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-    SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/map_gust_f%02d/' % (fxx)
+    SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/map_reflec_f%02d/' % (fxx)
     if not os.path.exists(SAVE):
         # make the SAVE directory
         os.makedirs(SAVE)
@@ -115,9 +112,7 @@ if __name__ == "__main__":
         photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
         os.link(photo_viewer, SAVE+'photo_viewer.php')
 
-    # =========================================================================
-
-    base = DATE
+    base = DATE - timedelta(hours=fxx) # adjust for forecast hour
     hours = (eDATE-DATE).days * 24
     date_list = [[fxx, base + timedelta(hours=x)] for x in range(0, hours)]
 

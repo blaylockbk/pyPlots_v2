@@ -45,58 +45,82 @@ if not os.path.exists(SAVE):
 
 # === Stuff you may want to change ============================================
 # Date range
-DATE = datetime(2017, 4, 4, 0)
-eDATE = datetime(2017, 4, 7, 0)
+DATE = datetime(2017, 4, 4, 12)
+eDATE = datetime(2017, 4, 6, 12)
+
+# MesoWest variable name (we'll translate the HRRR variable later)
+#MW_var = 'air_temp'
+#MW_var = 'wind_speed'
+#MW_var = 'wind_gust'
+MW_var = 'sea_level_pressure'
 
 # MesoWest stations for time series
-stations = ['KSTL', 'KSUS', 'KSPI', 'E0975', 'E0126']
-stations = ['KSTL']
+if MW_var == 'air_temp':
+    stations = ['KSTL', 'KSUS', 'KSPI', 'E0975']
+if MW_var == 'wind_speed':
+    stations = ['KSTL', 'KSUS', 'KSPI', 'E0975']
+if MW_var == 'sea_level_pressure':
+    stations = ['p43ax', 'q44bx', 'o44ax', 'KSTL', 'KSUS', 'KSPI', 'E0975', 'E0126']
 
 # Pollywog hours: a list of hours you want a pollywog to spawn
-pHours = [0, 6, 12, 18]
+pHours = range(24)
 
 # Head hours: a list of hours you want to plot a pollywog head (analysis value)
 hHours = range(24)
-
-# MesoWest variable name (we'll translate the HRRR variable later)
-MW_var = 'air_temp'
 
 # =============================================================================
 # =============================================================================
 # Variable name conversion between MesoWest and HRRR
 var_convert = {'air_temp':'TMP:2 m',
-               'wind_speed':'WIND:10 m'}
+               'wind_speed':'WIND:10 m',
+               'wind_gust':'GUST:surface',
+               'sea_level_pressure':'MSLMA:mean sea level'}
 
 # HRRR variable name
 HR_var = var_convert[MW_var]
 
 # Create the hourly date list
 base = DATE
-hours = (eDATE-DATE).days * 24
+hours = (eDATE-DATE).days * 24 + (eDATE-DATE).seconds/3600
 date_list = [base + timedelta(hours=x) for x in range(0, hours)]
 
 # Control plotting distinct colors based on number of pollywogs
-num_colors = len(pHours)*(eDATE-DATE).days
-color_idx = np.linspace(0, 1, num_colors)
-colors = cm.jet(color_idx)
-color_count = 0
+#num_colors = len(pHours)*(eDATE-DATE).days
+#color_idx = np.linspace(.1, .9, num_colors)
+#colors = cm.nipy_spectral(color_idx)
+
+# Nahh, just cycle through a long list of these colors.
+colors = ['red', 'royalblue', 'green', 'darkorange'] * 10
 
 # Create pollywog plot overlaying HRRR and MesoWest data for each station.
 for stn in stations:
+    # Color index
+    color_count = 0
+    
     # Create the plot
     fig, ax = plt.subplots(1)
 
     # Get MesoWest data
     a = get_mesowest_ts(stn, DATE, eDATE)
     # Plot the MesoWest data
-    plt.plot(a['DATETIME'], a[MW_var], c='k', lw=3, zorder=1)
+    if MW_var == 'sea_level_pressure':
+        if 'sea_level_pressure' not in a.keys():
+            plt.plot(a['DATETIME'], a['altimeter']/100, c='k', lw=3)
+        else:
+            plt.plot(a['DATETIME'], a['sea_level_pressure']/100, c='k', lw=3)
+
+    else:
+        plt.plot(a['DATETIME'], a[MW_var], c='k', lw=3, zorder=1)
 
     for D in date_list:
         if D.hour in pHours:
-            # Get HRRR pollywog for each hour requested
+            # Get HRRR pollywog for each hour requested and convert units
             pDates, pValues = get_hrrr_pollywog(D, HR_var, a['LAT'], a['LON'])
             if MW_var == 'air_temp':
                 pValues = pValues-273.15
+            if MW_var == 'sea_level_pressure':
+                pValues = pValues/100
+
             # Plot the HRRR data
             plt.scatter(pDates[0], pValues[0], c=colors[color_count], s=80, lw=0, zorder=2)
             plt.plot(pDates, pValues, c=colors[color_count], lw=2, zorder=2)
@@ -106,18 +130,24 @@ for stn in stations:
             pDates, pValues = get_hrrr_pollywog(D, HR_var, a['LAT'], a['LON'], forecast_limit=0)
             if MW_var == 'air_temp':
                 pValues = pValues-273.15
+            if MW_var == 'sea_level_pressure':
+                pValues = pValues/100
             # Plot the HRRR data point grey
-            plt.scatter(pDates[0], pValues[0], c=[.2,.2,.2], s=30, lw=0, zorder=3)
-
-
+            plt.scatter(pDates[0], pValues[0], c=[.2, .2, .2], s=30, lw=0, zorder=3)
 
     # Figure Cosmetics
     if MW_var == 'air_temp':
         plt.title('Temperature at %s' % (stn))
         plt.ylabel('Temperature (C)')
     elif MW_var == 'wind_speed':
-        plt.title('Wind Speed at %s (f%02d)' % (stn, fxx))
+        plt.title('Wind Speed at %s' % (stn))
         plt.ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
+    elif MW_var == 'wind_gust':
+        plt.title('Wind Gust at %s' % (stn))
+        plt.ylabel(r'Wind Gust (ms$\mathregular{^{-1}}$)')
+    elif MW_var == 'sea_level_pressure':
+        plt.title('Sea Level Pressure at %s' % (stn))
+        plt.ylabel('Pressure (hPa)')
     ax.set_xlim([date_list[0], date_list[-1]])
     plt.grid()
     ax.xaxis.set_major_locator(mdates.HourLocator([0, 12]))
