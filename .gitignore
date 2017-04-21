@@ -8,3 +8,6 @@ Thumbs.db
 *.csv
 *.nc
 *.grib2
+
+!tracer_plume.png
+!tracer_cross.png
