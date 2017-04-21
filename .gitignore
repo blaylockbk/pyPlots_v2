@@ -9,5 +9,4 @@ Thumbs.db
 *.nc
 *.grib2
 
-!tracer_plume.png
-!tracer_cross.png
+!tracer*.png
