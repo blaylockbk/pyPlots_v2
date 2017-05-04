@@ -18,19 +18,21 @@ from mpl_toolkits.basemap import Basemap
 import matplotlib.dates as mdates
 
 ## Reset the defaults (see more here: http://matplotlib.org/users/customizing.html)
-mpl.rcParams['figure.figsize'] = [17, 7]
+mpl.rcParams['figure.figsize'] = [7.48*2, 3*2]
 mpl.rcParams['figure.titlesize'] = 13
-mpl.rcParams['xtick.labelsize'] = 10
-mpl.rcParams['ytick.labelsize'] = 10
+mpl.rcParams['xtick.labelsize'] = 9
+mpl.rcParams['ytick.labelsize'] = 9
 mpl.rcParams['axes.labelsize'] = 10
 mpl.rcParams['axes.titlesize'] = 12
 mpl.rcParams['grid.linewidth'] = .25
-mpl.rcParams['figure.subplot.wspace'] = 0.05
-mpl.rcParams['figure.subplot.hspace'] = 0.05
+mpl.rcParams['figure.subplot.wspace'] = 0.15
+mpl.rcParams['figure.subplot.hspace'] = 0.15
 mpl.rcParams['legend.fontsize'] = 8
-mpl.rcParams['legend.loc'] = 'best'
+mpl.rcParams['legend.loc'] = 'upper left' # 'best'
+mpl.rcParams['legend.framealpha'] = .75
 mpl.rcParams['savefig.bbox'] = 'tight'
-mpl.rcParams['savefig.dpi'] = 150
+mpl.rcParams['savefig.dpi'] = 500
+mpl.rcParams['mathtext.default']= 'regular'
 
 import sys
 sys.path.append('/uufs/chpc.utah.edu/common/home/u0553130/pyBKB_v2')
@@ -56,8 +58,8 @@ location = {'OEST2': {'latitude': 32.97988,
 
 
 # 2) Get the HRRR data from NOMADS and store data nicely
-sDATE = datetime(2017, 4, 27)
-eDATE = datetime(2017, 4, 28)
+sDATE = datetime(2017, 4, 27, 9)
+eDATE = datetime(2017, 4, 28, 10)
 
 print "UTC DATE:", sDATE
 
@@ -83,14 +85,14 @@ TS_hcon = point_hrrr_time_series_multi(sDATE, eDATE, location, variable='HGT:lev
 # Convert the units of each Pollywog
 for loc in location.keys():
     # Convert Units for the variables in the Pollywog
-    TS_temp[loc] = KtoF(TS_temp[loc])
-    TS_dwpt[loc] = KtoF(TS_dwpt[loc])
-    TS_wind[loc] = mps_to_MPH(TS_wind[loc])
-    TS_gust[loc] = mps_to_MPH(TS_gust[loc])
-    TS_u[loc] = mps_to_MPH(TS_u[loc])
-    TS_v[loc] = mps_to_MPH(TS_v[loc])
-    TS_u80[loc] = mps_to_MPH(TS_u80[loc])
-    TS_v80[loc] = mps_to_MPH(TS_v80[loc])
+    TS_temp[loc] = KtoC(TS_temp[loc])
+    TS_dwpt[loc] = KtoC(TS_dwpt[loc])
+    #TS_wind[loc] = mps_to_MPH(TS_wind[loc])
+    #TS_gust[loc] = mps_to_MPH(TS_gust[loc])
+    #TS_u[loc] = mps_to_MPH(TS_u[loc])
+    #TS_v[loc] = mps_to_MPH(TS_v[loc])
+    #TS_u80[loc] = mps_to_MPH(TS_u80[loc])
+    #TS_v80[loc] = mps_to_MPH(TS_v80[loc])
     #TS_prec[loc] = mm_to_inches(TS_prec[loc])
 
     # Derive some variables:
@@ -106,20 +108,21 @@ maps = {}
 for loc in location.keys():
     l = location[loc]
     m = Basemap(resolution='i', projection='cyl',\
-                    llcrnrlon=l['longitude']-.1, llcrnrlat=l['latitude']-.1,\
-                    urcrnrlon=l['longitude']+.1, urcrnrlat=l['latitude']+.1,)
+                    llcrnrlon=l['longitude']-5, llcrnrlat=l['latitude']-5,\
+                    urcrnrlon=l['longitude']+5, urcrnrlat=l['latitude']+5,)
     maps[loc] = m
 
 for hh in range(len(TS_dates)):
+    #for hh in [0]:
     # 2.2) Radar Reflectivity and winds for entire CONUS
     fxx = 0
     H = get_hrrr_variable(TS_dates[hh], 'REFC:entire atmosphere', fxx=fxx, model='hrrr')
-    H_U = get_hrrr_variable(TS_dates[hh], 'UGRD:10 m', fxx=fxx, model='hrrr', value_only=True)
-    H_V = get_hrrr_variable(TS_dates[hh], 'VGRD:10 m', fxx=fxx, model='hrrr', value_only=True)
+#    H_U = get_hrrr_variable(TS_dates[hh], 'UGRD:10 m', fxx=fxx, model='hrrr', value_only=True)
+#    H_V = get_hrrr_variable(TS_dates[hh], 'VGRD:10 m', fxx=fxx, model='hrrr', value_only=True)
 
     # Convert Units (meters per second -> miles per hour)
-    H_U['value'] = mps_to_MPH(H_U['value'])
-    H_V['value'] = mps_to_MPH(H_V['value'])
+#    H_U['value'] = mps_to_MPH(H_U['value'])
+#    H_V['value'] = mps_to_MPH(H_V['value'])
 
     # Mask out empty reflectivity values
     dBZ = H['value']
@@ -152,6 +155,9 @@ for hh in range(len(TS_dates)):
 
         # 3.1) Map
         ax1 = plt.subplot(1, 2, 1)
+        m.drawstates()
+        m.drawcounties()
+        m.drawcountries()
 
         # ESRI Background image
         maps[loc].arcgisimage(service='World_Shaded_Relief', xpixels=1000, verbose=False)
@@ -161,58 +167,66 @@ for hh in range(len(TS_dates)):
         X, Y = m(H['lon'], H['lat'])
 
         # Plot point for location
-        maps[loc].scatter(x, y, s=100, color='white', edgecolor='k', zorder=100)
+        maps[loc].scatter(x, y, s=50, color='white', edgecolor='k', zorder=100)
 
         # Overlay Simulated Radar Reflectivity
         ctable = 'NWSReflectivity'
         norm, cmap = ctables.registry.get_with_steps(ctable, -0, 5)
-        maps[loc].pcolormesh(X, Y, dBZ, norm=norm, cmap=cmap, alpha=.5)
-        cb = plt.colorbar(orientation='horizontal', pad=0.01, shrink=0.75)
-        cb.set_label('Simulated Radar Reflectivity (dBZ)\n\nBarbs: Half=5 mph, Full=10 mph, Flag=50 mph')
+        #maps[loc].pcolormesh(X, Y, dBZ, norm=norm, cmap=cmap, alpha=.5)
+        maps[loc].pcolormesh(X, Y, dBZ, norm=norm, cmap=cmap)
+        cb = plt.colorbar(orientation='horizontal', pad=0.01, shrink=0.7)
+#        cb.set_label(r'Simulated Radar Reflectivity (dBZ)\n\nBarbs: Half=2.5 ms$\mathregular{^{-1}}$, Full=10 ms$\mathregular{^{-1}}$, Flag=50 ms$\mathregular{^{-1}}$')
+        cb.set_label(r'Simulated Composite Reflectivity (dBZ)')
 
         # Overlay wind barbs (need to trim this array before we plot it)
         # First need to trim the array
-        cut_vertical, cut_horizontal = pluck_point_new(l['latitude'],
-                                                       l['longitude'],
-                                                       H['lat'],
-                                                       H['lon'])
-        maps[loc].barbs(X[cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
-                        Y[cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
-                        H_U['value'][cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
-                        H_V['value'][cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
-                        zorder=200)
+#        cut_vertical, cut_horizontal = pluck_point_new(l['latitude'],
+#                                                       l['longitude'],
+#                                                       H['lat'],
+#                                                       H['lon'])
+#        maps[loc].barbs(X[cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
+#                        Y[cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
+#                        H_U['value'][cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
+#                        H_V['value'][cut_vertical-5:cut_vertical+5, cut_horizontal-5:cut_horizontal+5],
+#                        zorder=200,
+#                        barb_increments=dict(half=2.5, full=5, flag=25))
 
         # Overlay Utah Roads
-        BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-        maps[loc].readshapefile(BASE+'shape_files/tl_2015_UtahRoads_prisecroads/tl_2015_49_prisecroads',
-                                'roads',
-                                linewidth=.5)
+#        BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+#        maps[loc].readshapefile(BASE+'shape_files/tl_2015_UtahRoads_prisecroads/tl_2015_49_prisecroads',
+#                                'roads',
+#                                linewidth=.5)
         ax1.set_title('          UTC: %s\nLocal Time: %s' % (TS_dates[hh]+timedelta(hours=fxx), TS_dates[hh]+timedelta(hours=fxx)-timedelta(hours=tz)))
 
         # 3.2) Temperature/Dew Point
         ax2 = plt.subplot(3, 2, 2)
-        tempF = TS_temp[loc]
-        dwptF = TS_dwpt[loc]
-        ax2.plot(TS_temp['DATETIME'], tempF, c='r', lw='1.5', label='Temperature')
-        ax2.scatter(TS_temp['DATETIME'][hh], tempF[hh], c='r', s=60)
-        ax2.plot(TS_dwpt['DATETIME'], dwptF, c='g', lw='1.5', label='Dew Point')
-        ax2.scatter(TS_dwpt['DATETIME'][hh], dwptF[hh], c='g', s=60)
+        tempC = TS_temp[loc]
+        dwptC = TS_dwpt[loc]
+        ax2.plot(TS_temp['DATETIME'], tempC, c='r', lw='1.5', label='Temperature')
+#        ax2.scatter(TS_temp['DATETIME'][hh], tempC[hh], c='r', s=60)
+        ax2.plot(TS_dwpt['DATETIME'], dwptC, c='g', lw='1.5', label='Dew point')
+#        ax2.scatter(TS_dwpt['DATETIME'][hh], dwptC[hh], c='g', s=60)
         if l['is MesoWest'] is True:
-            a = get_mesowest_ts(loc, sDATE, eDATE, variables='air_temp,wind_speed')
-            b = get_mesowest_radius(TS_dates[hh], 15, extra='&radius=%s,30' % (loc), variables='wind_speed,wind_direction')
-            MW_u, MW_v = wind_spddir_to_uv(b['wind_speed'],b['wind_direction'])
-            MW_u = mps_to_MPH(MW_u)
-            MW_v = mps_to_MPH(MW_v)
-            ax2.plot(a['DATETIME'], CtoF(a['air_temp']), c='k', ls='--')
-            MWx, MWy = maps[loc](b['LON'], b['LAT'])
-            ax1.barbs(MWx, MWy, MW_u, MW_v, color='r')
+            a = get_mesowest_ts(loc, sDATE, eDATE, variables='air_temp,wind_speed,dew_point_temperature')
+#            b = get_mesowest_radius(TS_dates[hh], 15, extra='&radius=%s,30' % (loc), variables='wind_speed,wind_direction')
+#            MW_u, MW_v = wind_spddir_to_uv(b['wind_speed'],b['wind_direction'])
+#            MW_u = mps_to_MPH(MW_u)
+#            MW_v = mps_to_MPH(MW_v)
+            ax2.plot(a['DATETIME'], a['air_temp'], c='k', ls='--')
+            ax2.plot(a['DATETIME'], a['dew_point_temperature'], c='k', ls='--')
+#
+#            MWx, MWy = maps[loc](b['LON'], b['LAT'])
+#            ax1.barbs(MWx, MWy, MW_u, MW_v, color='r',
+#                      barb_increments=dict(half=2.5, full=5, flag=25))
 
-        ax2.legend()
+        leg2 = ax2.legend()
+        leg2.get_frame().set_linewidth(0)
         ax2.grid()
-        ax2.set_ylabel('Degrees (F)')
-        maxT = np.max([tempF.max(),CtoF(a['air_temp']).max()])
+        ax2.set_ylabel('Degrees (C)')
+        maxT = np.max([tempC.max(),a['air_temp'].max()])
+        minT = np.min([dwptC.min(),a['dew_point_temperature'].min()])
         ax2.set_xlim([TS_temp['DATETIME'][0], TS_temp['DATETIME'][-1]])
-        ax2.set_ylim([dwptF.min()-1, maxT+1])
+        ax2.set_ylim([minT-3, maxT+3])
         ax2.xaxis.set_major_locator(mdates.HourLocator(range(0, 24, 3)))
         ax2.xaxis.set_minor_locator(mdates.HourLocator(range(0, 24, 1)))
         ax2.xaxis.set_major_formatter(mdates.DateFormatter(''))
@@ -221,14 +235,14 @@ for hh in range(len(TS_dates)):
         # 3.3) Wind Speed and Barbs
         ax3 = plt.subplot(3, 2, 4)
         ax3.plot(TS_wind['DATETIME'], TS_wind80[loc], c='saddlebrown', lw='1.5', label='Instantaneous 80 m wind')
-        ax3.scatter(TS_wind['DATETIME'][hh], TS_wind80[loc][hh], c='saddlebrown', s=60)
-        ax3.plot(TS_gust['DATETIME'], TS_gust[loc], c='chocolate', lw='1.5', label='Instantaneous 10 m Wind Gust')
-        ax3.scatter(TS_gust['DATETIME'][hh], TS_gust[loc][hh], c='chocolate', s=60)
-        ax3.plot(TS_wind['DATETIME'], TS_wind[loc], c='darkorange', lw='1.5', label='Previous hour max 10 m wind')
-        ax3.scatter(TS_wind['DATETIME'][hh], TS_wind[loc][hh], c='darkorange', s=60)
+#        ax3.scatter(TS_wind['DATETIME'][hh], TS_wind80[loc][hh], c='saddlebrown', s=60)
+        ax3.plot(TS_gust['DATETIME'], TS_gust[loc], c='chocolate', lw='1.5', label='Instantaneous 10 m gust')
+#        ax3.scatter(TS_gust['DATETIME'][hh], TS_gust[loc][hh], c='chocolate', s=60)
+        ax3.plot(TS_wind['DATETIME'], TS_wind[loc], c='gold', lw='1.5', label='Previous hour max 10 m wind')
+#        ax3.scatter(TS_wind['DATETIME'][hh], TS_wind[loc][hh], c='darkorange', s=60)
         if l['is MesoWest'] is True:
             # alreaded loaded up mesowest data into a
-            ax3.plot(a['DATETIME'], mps_to_MPH(a['wind_speed']), c='k', ls='--')
+            ax3.plot(a['DATETIME'], a['wind_speed'], c='k', ls='--')
 
         # plt.barbs can not take a datetime object, so find the date indexes:
         # (For some reason, matplotlib doesn't like plotting these barbs, so
@@ -238,13 +252,17 @@ for hh in range(len(TS_dates)):
         us = TS_u[loc]
         vs = TS_v[loc]
         for ii in range(len(idx)):
-            ax3.barbs(idx[ii], speeds[ii], us[ii], vs[ii])
+            ax3.barbs(idx[ii], speeds[ii], us[ii], vs[ii],
+                      length=5,
+                      barb_increments=dict(half=2.5, full=5, flag=25))
 
-        ax3.legend()
+        leg3 = ax3.legend()
+        leg3.get_frame().set_linewidth(0)
         ax3.grid()
-        #ax3.set_ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
-        ax3.set_ylabel('Wind Speed (mph)')
-        ax3.set_ylim([0, TS_gust[loc].max()+3])
+        ax3.set_ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
+        #ax3.set_ylabel('Wind Speed (mph)')
+        #ax3.set_ylim([0, TS_gust[loc].max()+3])
+        ax3.set_ylim([0, 22.5])
         ax3.set_yticks([0, TS_gust[loc].max()+3], 2.5)
         ax3.set_xlim([TS_gust['DATETIME'][0], TS_gust['DATETIME'][-1]])
         ax3.xaxis.set_major_locator(mdates.HourLocator(range(0, 24, 3)))
@@ -270,22 +288,24 @@ for hh in range(len(TS_dates)):
         ax4.set_ylabel('Precipitation (in)')
         """
         # 3.4) Height of boundary layer
-        local = np.array(TS_dates - timedelta(hours=tz))
+#        local = np.array(TS_dates - timedelta(hours=tz))
+
         ax4 = plt.subplot(3, 2, 6)
-        ax4.plot(local, TS_hcon[loc], color='skyblue', lw='1.5', label='Level of adiabatic condensation from surface')
-        ax4.scatter(local[hh], TS_hcon[loc][hh], color='skyblue', s=60)
-        ax4.plot(local, TS_hpbl[loc], color='indigo', lw='1.5', label='Boundary Layer Height')
-        ax4.scatter(local[hh], TS_hpbl[loc][hh], color='indigo', s=60)
-        ax4.set_xlim([local[0], local[-1]])
-        ax4.set_ylim([0, TS_hcon[loc].max()+200])
+        ax4.plot(TS_dates, TS_hcon[loc], color='skyblue', lw='1.5', label='Level of adiabatic condensation from surface')
+#        ax4.scatter(local[hh], TS_hcon[loc][hh], color='skyblue', s=60)
+        ax4.plot(TS_dates, TS_hpbl[loc], color='indigo', lw='1.5', label='Boundary layer height')
+#        ax4.scatter(local[hh], TS_hpbl[loc][hh], color='indigo', s=60)
+        ax4.set_xlim([TS_dates[0], TS_dates[-1]])
+        ax4.set_ylim([0, 5300])
         ax4.xaxis.set_major_locator(mdates.HourLocator(range(0, 24, 3)))
         ax4.xaxis.set_minor_locator(mdates.HourLocator(range(0, 24, 1)))
         ax4.xaxis.set_major_formatter(mdates.DateFormatter('%b-%d\n%H:%M'))
 
-        ax4.legend()
+        leg4 = ax4.legend()
+        leg4.get_frame().set_linewidth(0)
         ax4.grid()
         ax4.set_ylabel('Height (m)')
-        ax4.set_xlabel('Local Time')
+        #ax4.set_xlabel('UTC Time')
 
         # 4) Save figure
         save_name = SAVE+'%s_f%02d.png' % (TS_dates[hh].strftime('%Y-%m-%d_%H%M'),fxx)

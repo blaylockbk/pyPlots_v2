@@ -33,60 +33,76 @@ from BB_MesoWest.MesoWest_timeseries import get_mesowest_ts
 from MetPy_BB.plots import ctables
 
 # Get the map object
-#m = draw_CONUS_HRRR_map()
-m = draw_midwest_map()
+m = draw_CONUS_HRRR_map()
 
-def plot_ref(inputs):
-    """
-    Plots surface gusts with the MSLP countours
-    """
+def plots(inputs):
     fxx = inputs[0]
     DATE = inputs[1]
 
-    # Get the composite reflectivity
-    VAR = 'REFC:entire atmosphere'
+    plt.figure(1)
+    # Get the 2m Temperature
+    VAR = 'TMP:2 m'
     H = get_hrrr_variable(DATE, VAR, fxx=fxx)
-
-    # Get the mean sea level pressure
-    VAR2 = 'MSLMA:mean sea level'
-    H2 = get_hrrr_variable(DATE, VAR2, fxx=fxx)
-    mslp = H2['value'] /100 # in hPa
-
-    fig = plt.figure()
-    fig.add_subplot(111)
-
     x, y = m(H['lon'], H['lat'])
-    ref = H['value'] # in dBZ
-
-    ref = ma.array(ref)
-    ref[ref==-10] = ma.masked
-
+    temp = H['value']-273.15 # in C
     m.drawstates()
     m.drawcoastlines()
     m.drawcountries()
+    m.pcolormesh(x, y, temp, cmap='Spectral_r')
+    savedate = H['valid'].strftime('valid_%Y-%m-%d_%H%M')
+    plt.savefig(SAVE+savedate+'_f%02d_TEMP2m' % (fxx), bbox_inches="tight", dpi=300)
 
+
+    plt.figure(2)
+    # Get the mean sea level pressure
+    VAR = 'MSLMA:mean sea level'
+    H = get_hrrr_variable(DATE, VAR, fxx=fxx)
+    mslp = H['value'] /100 # in hPa
+    m.drawstates()
+    m.drawcoastlines()
+    m.drawcountries()
+    plt.pcolormesh(x, y, mslp, cmap='viridis')
+    levels = np.arange(960, 1100, 4)
+    CS = m.contour(x, y, mslp, colors='k', linewidths=.7, levels=levels)
+    plt.clabel(CS, levels[1::2], fontsize=8, inline=1, fmt='%1.0f')
+    plt.savefig(SAVE+savedate+'_f%02d_MSLP' % (fxx), bbox_inches="tight", dpi=300)
+
+    plt.figure(3)
+    # Get Simulated Composite Reflectivity
+    VAR = 'REFC:entire atmosphere'
+    H = get_hrrr_variable(DATE, VAR, fxx=fxx)
+    ref = H['value'] # in dBZ
+    ref = ma.array(ref)
+    ref[ref == -10] = ma.masked
+    m.drawstates()
+    m.drawcoastlines()
+    m.drawcountries()
     ctable = 'NWSReflectivity'
     norm, cmap = ctables.registry.get_with_steps(ctable, -0, 5)
     m.pcolormesh(x, y, ref, norm=norm, cmap=cmap)
-    cb = plt.colorbar(orientation='horizontal',
-                      shrink=.7,
-                      pad=.03)
+    plt.savefig(SAVE+savedate+'_f%02d_REFC' % (fxx), bbox_inches="tight", dpi=300)
 
-    cb.set_label(r'Simulated Composite Reflectivity (dBZ)')
+    plt.figure(4)
+    # Get the mean sea level pressure
+    VAR = 'DPT:2 m'
+    H = get_hrrr_variable(DATE, VAR, fxx=fxx)
+    dwpt = H['value'] -273.15
+    m.drawstates()
+    m.drawcoastlines()
+    m.drawcountries()
+    plt.pcolormesh(x, y, dwpt, cmap='BrBG', vmin=-20, vmax=20)
+    plt.savefig(SAVE+savedate+'_f%02d_DWPT' % (fxx), bbox_inches="tight", dpi=300)
 
-    # MSLP Countours
-    levels = np.arange(960, 1100, 4)
-    CS = m.contour(x, y, mslp, colors='k', levels=levels)
-    plt.clabel(CS, levels[1::2], fontsize=10, inline=1, fmt='%1.0f')
-
-    if fxx == 0:
-        plt.title('HRRR Anlys %s Valid: %s' % (VAR, H['valid']))
-    else:
-        plt.title('HRRR f%02d %s Valid: %s' % (fxx, VAR, H['valid']))
-
-    savedate = H['valid'].strftime('valid_%Y-%m-%d_%H%M')
-    plt.savefig(SAVE+savedate+'_f%02d' % (fxx), bbox_inches="tight", dpi=300)
-    print 'saved', SAVE+savedate+'_f%02d' % (fxx)
+    plt.figure(5)
+    # Gust
+    VAR = 'GUST:surface'
+    H = get_hrrr_variable(DATE, VAR, fxx=fxx)
+    gust = H['value']
+    m.drawstates()
+    m.drawcoastlines()
+    m.drawcountries()
+    plt.pcolormesh(x, y, gust, cmap='inferno_r')
+    plt.savefig(SAVE+savedate+'_f%02d_Gust' % (fxx), bbox_inches="tight", dpi=300)
 
 
 if __name__ == "__main__":
@@ -95,17 +111,16 @@ if __name__ == "__main__":
 
     # === Stuff you may want to change ========================================
     # Date range
-    DATE = datetime(2017, 4, 4, 18)
-    eDATE = datetime(2017, 4, 6, 0)
+    DATE = datetime(2017, 4, 5, 14)
 
     # Forecast Hour
-    fxx = 16
+    fxx = 0
 
     # =========================================================================
 
     # Save directory
     BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
-    SAVE = BASE + 'public_html/PhD/HRRR/GravityWave_2017-04-05/map_reflec_f%02d/' % (fxx)
+    SAVE = BASE + 'public_html/PhD/HRRR/Samples/'
     if not os.path.exists(SAVE):
         # make the SAVE directory
         os.makedirs(SAVE)
@@ -113,18 +128,4 @@ if __name__ == "__main__":
         photo_viewer = BASE + 'public_html/Brian_Blaylock/photo_viewer/photo_viewer.php'
         os.link(photo_viewer, SAVE+'photo_viewer.php')
 
-    base = DATE - timedelta(hours=fxx) # adjust for forecast hour
-    hours = (eDATE-DATE).days * 24
-    date_list = [[fxx, base + timedelta(hours=x)] for x in range(0, hours)]
-
-    num_proc = multiprocessing.cpu_count() # use all processors
-    p = multiprocessing.Pool(num_proc)
-
-    # Create plot for each hour
-    p.map(plot_ref, date_list)
-    p.close()
-
-    total_time = datetime.now() - timer1
-    print ""
-    print 'total time:', total_time, 'with', num_proc, 'processors.'
-
+    plots([fxx, DATE])
