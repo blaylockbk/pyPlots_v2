@@ -44,13 +44,30 @@ sDATE = datetime(2017, 6, 8)
 eDATE = datetime(2017, 6, 13)
 
 # Set Station Location
-stn = 'GNI'
+stn = 'KSLC'
 
 # Set the Variable
-HRRR_var = 'WIND:10 m'
-MW_var = 'wind_speed'
-title_var = "Wind Speed"
+#HRRR_var = 'WIND:10 m'
+#MW_var = 'wind_speed'
+#title_var = "Wind Speed"
+
+#HRRR_var = 'TMP:2 m'
+#MW_var = 'air_temp'
+#title_var = "Air Temperature"
+
+HRRR_var = 'DPT:2 m'
+MW_var = 'dew_point_temperature'
+title_var = "Dew Point Temperature"
 #==============================================================================
+# Set colormap
+if MW_var == 'wind_speed':
+    cmap = 'magma_r'
+elif MW_var == 'dew_point_temperature':
+    cmap = 'BrBG'
+elif MW_var == 'air_temp':
+    cmap = 'Spectral_r'
+else:
+    cmap = 'viridis'
 
 # Get data from the MesoWest Station
 a = get_mesowest_ts(stn, sDATE, eDATE, variables=MW_var)
@@ -66,7 +83,10 @@ for f in range(19):
                                            fxx=f)
 
 # combine the data arrays into a hovmoller array
-hovmoller = np.array([data[i][stn] for i in range(19)])
+if MW_var == 'air_temp' or MW_var == 'dew_point_temperature':
+    hovmoller = np.array([data[i][stn]-273.15 for i in range(19)])
+else:
+    hovmoller = np.array([data[i][stn] for i in range(19)])
 hovDATES = np.append(data[0]['DATETIME'], data[0]['DATETIME'][-1]+timedelta(hours=1))
 hovFxx = range(20)
 hmin = np.nanmin([np.nanmin(a[MW_var]), np.nanmin(hovmoller)])
@@ -79,14 +99,14 @@ ax2 = plt.subplot(8, 1, 8)
 
 plt.suptitle('%s %s\n%s - %s' % (stn, title_var, sDATE.strftime('%Y-%m-%d %H:%M'), eDATE.strftime('%Y-%m-%d %H:%M')))
 
-hv = ax1.pcolormesh(hovDATES, hovFxx, hovmoller, cmap='magma_r', vmax=hmax, vmin=hmin)
+hv = ax1.pcolormesh(hovDATES, hovFxx, hovmoller, cmap=cmap, vmax=hmax, vmin=hmin)
 ax1.set_xlim(hovDATES[0], hovDATES[-1])
 ax1.set_ylim(0, 19)
 ax1.set_yticks(range(0,19,3))
 ax1.axes.xaxis.set_ticklabels([])
 ax1.set_ylabel('HRRR Forecast Hour')
 
-mw = ax2.pcolormesh(a['DATETIME'], range(3), [a['wind_speed'],a['wind_speed']], cmap='magma_r', vmax=hmax, vmin=hmin)
+mw = ax2.pcolormesh(a['DATETIME'], range(3), [a[MW_var],a[MW_var]], cmap=cmap, vmax=hmax, vmin=hmin)
 ax2.axes.yaxis.set_ticklabels([])
 ax2.set_yticks([])
 ax2.set_ylabel('Observed')
@@ -95,10 +115,15 @@ ax2.set_ylabel('Observed')
 fig.subplots_adjust(hspace=0, right=0.8)
 cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
 cb = fig.colorbar(hv, cax=cbar_ax)
-cb.ax.set_ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
+if MW_var == 'wind_speed':
+    cb.ax.set_ylabel(r'Wind Speed (ms$\mathregular{^{-1}}$)')
+if MW_var == 'air_temp':
+    cb.ax.set_ylabel('Air Temperature (C)')
+if MW_var == 'dew_point_temperature':
+    cb.ax.set_ylabel('Dew Point Temperature (C)')
 
 ax2.xaxis.set_major_locator(HourLocator(byhour=[0, 6, 12, 18]))
 dateFmt = DateFormatter('%b %d\n%H:%M')
 ax2.xaxis.set_major_formatter(dateFmt)
 
-plt.savefig('HRRR_hovmoller_%s.png' % stn)
+plt.savefig('HRRR_hovmoller_%s_%s.png' % (stn, MW_var))
