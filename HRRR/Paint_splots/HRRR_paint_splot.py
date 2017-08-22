@@ -49,23 +49,19 @@ from BB_basemap.draw_maps import draw_CONUS_cyl_map
 
 # =============================================================================
 daylight = time.daylight # If daylight is on (1) then subtract from timezone.
-location = {'UKBKB': {'latitude':40.09867,
-                      'longitude':-111.62767,
-                      'name':'Spanish Fork Bench',
-                      'timezone': 7-daylight,
-                      'is MesoWest': True},
-            'KSLC':{'latitude':40.77069,
-                    'longitude':-111.96503,
-                    'name':'Salt Lake International Airport',
-                    'timezone': 7-daylight,
-                    'is MesoWest': True}}
+location = {'WBB':{'latitude':40.76623,
+                   'longitude':-111.84755 ,
+                   'name': 'WBB',
+                   'timezone': 7-daylight,
+                   'is MesoWest': True}
+            }
 
 colors = ['red', 'lightsage', 'lightpink', 'lawngreen', 'tomato', \
             'skyblue', 'thistle', 'teal', 'steelblue', 'springgreen', \
             'powderblue', 'red', 'blue', 'yellow', 'orange', \
             'brown', 'cornsilk', 'darkgrey', 'seagreen']
 
-def splot_same_time(DATE, loc, fxx=range(18,-1, -1)):
+def splot_same_time(DATE, loc, fxx=range(18,-1, -1), threshold=35):
     """
     Make paint splots for a single verification time
 
@@ -76,37 +72,44 @@ def splot_same_time(DATE, loc, fxx=range(18,-1, -1)):
         fxx  - forecast hours (work backwards from 18 to 0 so analysis hour is plotted on top)
     """
 
-    #for L in loc:
-    #    l = loc[L]
-    #
-    #    # Create a figure
-    #    plt.clf()
-    #    plt.cla()
-    #    m = Basemap(resolution='i', projection='cyl',\
-    #                llcrnrlon=l['longitude']-.75, llcrnrlat=l['latitude']-.75,\
-    #                urcrnrlon=l['longitude']+.75, urcrnrlat=l['latitude']+.75,)
-    m = draw_CONUS_cyl_map()
-    m.arcgisimage(service='World_Shaded_Relief', xpixels=2700, verbose=False)
-    m.drawstates()
-    m.drawcountries()
+    for L in loc:
+        l = loc[L]
+    
+        # Create a figure
+        plt.clf()
+        plt.cla()
+        m = Basemap(resolution='i', projection='cyl',\
+                    llcrnrlon=l['longitude']-1.75, llcrnrlat=l['latitude']-1.75,\
+                    urcrnrlon=l['longitude']+1.75, urcrnrlat=l['latitude']+1.75,)
+        #m = draw_CONUS_cyl_map()
+        m.arcgisimage(service='World_Shaded_Relief', xpixels=700, verbose=False)
+        m.drawstates()
+        m.drawcoastlines()
+        m.drawcountries()
+        # Overlay Utah Roads
+        BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+        m.readshapefile(BASE+'shape_files/tl_2015_UtahRoads_prisecroads/tl_2015_49_prisecroads',
+                                    'roads',
+                                    linewidth=.5,
+                                    color='dimgrey')
 
-    for f in fxx:
-        # Get HRRR data
-        get_DATE = DATE - timedelta(hours=f)
-        H = get_hrrr_variable(get_DATE, 'REFC:entire atmosphere', fxx=f)
-        # Set mask criteria
-        dBZ = H['value']
-        dBZ = np.ma.array(dBZ)
-        dBZ[dBZ < 20] = np.ma.masked
-        # Plot the masked array on the map
-        plt.pcolormesh(H['lon'], H['lat'], dBZ, cmap=c.ListedColormap([colors[f]]), alpha=.5)
-        plt.title('All forecasts valid at %s\nHRRR Reflectivity > 20 dBZ' % (DATE.strftime('%Y-%b-%d %H:%M')))
+        for f in fxx:
+            # Get HRRR data
+            get_DATE = DATE - timedelta(hours=f)
+            H = get_hrrr_variable(get_DATE, 'REFC:entire atmosphere', fxx=f)
+            # Set mask criteria
+            dBZ = H['value']
+            dBZ = np.ma.array(dBZ)
+            dBZ[dBZ < threshold] = np.ma.masked
+            # Plot the masked array on the map
+            plt.pcolormesh(H['lon'], H['lat'], dBZ, cmap=c.ListedColormap([colors[f]]), alpha=.85)
+            plt.title('All forecasts valid at %s\nHRRR Reflectivity > %s dBZ' % (DATE.strftime('%Y-%b-%d %H:%M'), threshold))
 
-    plt.savefig('REF_paint_validat_%s' % DATE.strftime("%Y%m%d-%H%M"))
+        plt.savefig('REF_paint_validat_%s_%s' % (DATE.strftime("%Y%m%d-%H%M"), l['name']))
 
 
 
-def splot_same_run(DATE, fxx=range(0,19)):
+def splot_same_run(DATE, loc, fxx=range(18, -1, -1), threshold=35):
     """
     Make paint splots for each hour of a certain model run hour.
 
@@ -114,25 +117,37 @@ def splot_same_run(DATE, fxx=range(0,19)):
         DATE - the model run time. Will consider all forecast hours outputed by
                the model at that run time.
     """
-    m = draw_CONUS_cyl_map()
-    m.arcgisimage(service='World_Shaded_Relief', xpixels=2700, verbose=False)
-    m.drawstates()
-    m.drawcountries()
+    for L in loc:
+        l = loc[L]
+        m = Basemap(resolution='i', projection='cyl',\
+                    llcrnrlon=l['longitude']-1.75, llcrnrlat=l['latitude']-1.75,\
+                    urcrnrlon=l['longitude']+1.75, urcrnrlat=l['latitude']+1.75,)
+        #m = draw_CONUS_cyl_map()
+        m.arcgisimage(service='World_Shaded_Relief', xpixels=700, verbose=False)
+        m.drawstates()
+        m.drawcoastlines()
+        m.drawcountries()
+        # Overlay Utah Roads
+        BASE = '/uufs/chpc.utah.edu/common/home/u0553130/'
+        m.readshapefile(BASE+'shape_files/tl_2015_UtahRoads_prisecroads/tl_2015_49_prisecroads',
+                                    'roads',
+                                    linewidth=.5,
+                                    color='dimgrey')
 
-    for f in fxx:
-        # Get HRRR data
-        H = get_hrrr_variable(DATE, 'REFC:entire atmosphere', fxx=f)
-        # Set mask criteria
-        dBZ = H['value']
-        dBZ = np.ma.array(dBZ)
-        dBZ[dBZ < 20] = np.ma.masked
-        # Plot the masked array on the map
-        plt.pcolormesh(H['lon'], H['lat'], dBZ, cmap=c.ListedColormap([colors[f]]), alpha=.5)
-        plt.title('Run begining at %s\nHRRR Reflectivity > 20 dBZ' % (DATE.strftime('%Y-%b-%d %H:%M')))
+        for f in fxx:
+            # Get HRRR data
+            H = get_hrrr_variable(DATE, 'REFC:entire atmosphere', fxx=f)
+            # Set mask criteria
+            dBZ = H['value']
+            dBZ = np.ma.array(dBZ)
+            dBZ[dBZ < threshold] = np.ma.masked
+            # Plot the masked array on the map
+            plt.pcolormesh(H['lon'], H['lat'], dBZ, cmap=c.ListedColormap([colors[f]]), alpha=.85)
+            plt.title('Run begining at %s\nHRRR Reflectivity > %s dBZ' % (DATE.strftime('%Y-%b-%d %H:%M'), threshold))
 
-    plt.savefig('REF_paint_runbegining_%s' % DATE.strftime("%Y%m%d-%H%M"))
+        plt.savefig('REF_paint_runbegining_%s_%s' % (DATE.strftime("%Y%m%d-%H%M"), l['name']))
 
 if __name__ == "__main__":
-    DATE = datetime(2017, 7, 6, 18)
+    DATE = datetime(2017, 7, 26, 10)
     splot_same_time(DATE, loc=location)
-    splot_same_run(DATE)
+    splot_same_run(DATE, loc=location)
