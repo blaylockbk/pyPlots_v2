@@ -6,7 +6,7 @@ Plot hourly eclipse path with
 MesoWest, HRRR, and HRRRx Short Wave Radiation Flux
 """
 import matplotlib as mpl
-mpl.use('Agg')#required for the CRON job. Says "do not open plot in a window"??
+#mpl.use('Agg')#required for the CRON job. Says "do not open plot in a window"??
 import numpy as np
 from datetime import datetime, timedelta, date
 import matplotlib.pyplot as plt
@@ -17,6 +17,7 @@ sys.path.append('/uufs/chpc.utah.edu/common/home/u0553130/pyBKB_v2/')
 from BB_MesoWest.MesoWest_radius import get_mesowest_radius
 from BB_basemap.draw_maps import draw_CONUS_cyl_map, draw_CONUS_HRRR_map
 from BB_downloads.HRRR_S3 import get_hrrr_variable
+from BB_wx_calcs.wind import wind_uv_to_spd
 
 import matplotlib as mpl
 mpl.rcParams['figure.subplot.wspace'] = 0.05
@@ -58,7 +59,7 @@ m.drawcountries()
 m.drawcoastlines()
 
 ax3 = fig.add_subplot(133)
-ax3.set_title('Difference')
+ax3.set_title('Experimental - Operational')
 m.drawstates()
 m.drawcountries()
 m.drawcoastlines()
@@ -81,6 +82,34 @@ within = 15
 is_colorbar_on = False
 SAVEDIR = '/uufs/chpc.utah.edu/common/home/u0553130/public_html/PhD/Eclipse20170821/'
 
+variable = 'TMP:2 m'
+variable = 'DSWRF:surface'
+variable = 'WIND:10 m'
+#variable = 'UVSpeed:10 m'
+
+var_str = variable.replace(':', '_').replace(' ', '')
+
+if variable == 'TMP:2 m':
+    label = 'Temperature (C)'
+    offset = 273.15
+    vmin = 5; vmax = 35
+    vminD = -3; vmaxD = 3
+    ticks = range(vminD, vmaxD+1)
+    cmap = 'Spectral_r'
+elif variable == 'DSWRF:surface':
+    label = r'Solar Radiation (W m$\mathregular{^{-2}}$)'
+    offset = 0
+    vmin = 100; vmax = 1000
+    vminD = -800; vmaxD = 800
+    ticks = range(vminD, vmaxD+1, 400)
+    cmap = 'magma'
+elif variable == 'WIND:10 m' or variable == 'UVSpeed:10 m':
+    label = r'Wind Speed (ms$\mathregular{^{-1}}$)'
+    offset = 0
+    vmin = 0; vmax = 15
+    vminD = -4; vmaxD = 4
+    ticks = range(vminD, vmaxD+1)
+    cmap = 'plasma'
 
 for i in range(num):
     if DATES[i].minute != 0:
@@ -92,15 +121,23 @@ for i in range(num):
         attime = DATES[i] 
         print DATES[i] 
         print '!', attime
-        H = get_hrrr_variable(attime, variable="DSWRF:surface")
-        HX = get_hrrr_variable(attime, variable="DSWRF:surface", model='hrrrX', removeFile=False, value_only=True)
+        if variable == 'UVSpeed:10 m':
+            uH = get_hrrr_variable(attime, variable='UGRD:10 m')
+            vH = get_hrrr_variable(attime, variable='VGRD:10 m')
+            uHX = get_hrrr_variable(attime, variable='UGRD:10 m', model='hrrrX', removeFile=True, value_only=True)
+            vHX = get_hrrr_variable(attime, variable='VGRD:10 m', model='hrrrX', removeFile=True, value_only=True)
+            H = {'lat':uH['lat'],
+                 'lon':uH['lon'],
+                 'value': wind_uv_to_spd(uH['value'], vH['value'])}
+            HX = {'value': wind_uv_to_spd(uHX['value'], vHX['value'])}
+        else:
+            H = get_hrrr_variable(attime, variable=variable)
+            HX = get_hrrr_variable(attime, variable=variable, model='hrrrX', removeFile=True, value_only=True)
         Hx, Hy = m(H['lon'], H['lat'])
-        HRRR_plot = ax1.pcolormesh(Hx, Hy, H['value'], vmin=100, vmax=1000, cmap='magma')
-        HRRRx_plot = ax2.pcolormesh(Hx, Hy, HX['value'], vmin=100, vmax=1000, cmap='magma')
-        DIFF_plot = ax3.pcolormesh(Hx, Hy, HX['value']-H['value'], vmin=100, vmax=1000, cmap='bwr')
+        HRRR_plot = ax1.pcolormesh(Hx, Hy, H['value']-offset, vmin=vmin, vmax=vmax, cmap=cmap)
+        HRRRx_plot = ax2.pcolormesh(Hx, Hy, HX['value']-offset, vmin=vmin, vmax=vmax, cmap=cmap)
+        DIFF_plot = ax3.pcolormesh(Hx, Hy, HX['value']-H['value'], vmin=vminD, vmax=vmaxD, cmap='bwr')
         #
-        #
-        x, y = m(a['LON'], a['LAT'])
         #
         # Plot CONUS
         Epoint1 = ax1.scatter(Cx[i], Cy[i], c='r', s=90, zorder=500)
@@ -111,19 +148,82 @@ for i in range(num):
             from mpl_toolkits.axes_grid1 import make_axes_locatable
             divider = make_axes_locatable(ax2)
             #cax = divider.append_axes('bottom', size='6%', pad=.25)
-            cax = fig.add_axes([0.3, 0.08, 0.4, 0.05])
+            cax = fig.add_axes([0.23, 0.08, 0.3, 0.05])
             cb = fig.colorbar(HRRR_plot, cax=cax, orientation='horizontal', extend="both")
-            cb.set_label(r'Solar Radiation (W m$\mathregular{^{-2}}$)')
+            cb.set_label(label)
+            #
+            divider = make_axes_locatable(ax3)
+            #cax = divider.append_axes('bottom', size='6%', pad=.25)
+            cax = fig.add_axes([0.68, 0.08, 0.2, 0.05])
+            cb = fig.colorbar(DIFF_plot, cax=cax, orientation='horizontal', extend="both")
+            cb.set_label(r'$\Delta$ ' + label)
+            cb.set_ticks(ticks)
             is_colorbar_on = True
         #
-        plt.suptitle('Eclipse: %s\n MesoWest/HRRR: %s' % (DATES[i], attime))
+        plt.suptitle('Time (UTC): %s' % (attime))
         print '!', attime
-        plt.savefig(SAVEDIR+'HRRR_TEMP_diff/HRRR_%s.png' % attime.strftime('%Y-%m-%d_%H%M'), bbox_inches='tight')
+        plt.savefig(SAVEDIR+'HRRR_'+var_str+'/HRRR_%s.png' % attime.strftime('%Y-%m-%d_%H%M'), bbox_inches='tight')
         Epoint1.remove()
         Epoint2.remove()
         Epoint3.remove()
+        HRRR_plot.remove()
+        HRRRx_plot.remove()
+        DIFF_plot.remove()
+
 
 # Create animated gifs of the files on the eclipse day
 if DATES[0].day == 21:
     import os
-    os.system('convert -delay 60 '+SAVEDIR+'HRRR_TEMP_diff/*2017-08-21*.png '+SAVEDIR+'HRRR/Animated.gif')
+    os.system('convert -delay 60 '+SAVEDIR+'HRRR_'+var_str+'/*2017-08-21*.png '+SAVEDIR+'HRRR_'+var_str+'/Animated.gif')
+
+
+"""
+H = get_hrrr_variable(attime, variable='WIND:10 m', fxx=1, removefile=False)
+HX = get_hrrr_variable(attime, variable='WIND:10 m', model='hrrrX', fxx=1)
+Hx, Hy = m(H['lon'], H['lat'])
+
+plt.figure(1)
+plt.title('Operational ' + str(attime) + ' WIND:10 m')
+plt.pcolormesh(Hx, Hy, H['value'], vmin=0, vmax=5)
+m.drawcoastlines()
+
+plt.figure(2)
+plt.title('Experimental ' + str(attime) + ' WIND:10 m')
+plt.pcolormesh(Hx, Hy, HX['value'], vmin=0, vmax=5)
+m.drawcoastlines()
+
+
+
+uH = get_hrrr_variable(attime, variable='UGRD:10 m')
+vH = get_hrrr_variable(attime, variable='VGRD:10 m')
+uHX = get_hrrr_variable(attime, variable='UGRD:10 m', model='hrrrX', removeFile=True, value_only=True)
+vHX = get_hrrr_variable(attime, variable='VGRD:10 m', model='hrrrX', removeFile=True, value_only=True)
+H = {'lat':uH['lat'],
+        'lon':uH['lon'],
+        'value': wind_uv_to_spd(uH['value'], vH['value'])}
+HX = {'value': wind_uv_to_spd(uHX['value'], vHX['value'])}
+Hx, Hy = m(H['lon'], H['lat'])
+
+plt.figure(1)
+plt.title('Operational ' + str(attime) + ' Speed from U and VGRD:10 m')
+plt.pcolormesh(Hx, Hy, H['value'], vmin=0, vmax=5)
+m.drawcoastlines()
+
+plt.figure(2)
+plt.title('Experimental ' + str(attime) + ' Speed from U and VGRD:10 m')
+plt.pcolormesh(Hx, Hy, HX['value'], vmin=0, vmax=5)
+m.drawcoastlines()
+
+
+
+
+grbs = pygrib.open('hrrrX.t20z.wrfsfcf00.grib2')
+H = grbs[66]
+lat, lon = H.latlons()
+x, y = m(lon, lat)
+m.drawcoastlines()
+m.pcolormesh(x, y, H.values, vmin=0, vmax=15)
+plt.title('hrrrX.t20z.wrfsfcf00.grib2\n' + str(H))
+
+
+"""
