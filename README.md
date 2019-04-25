@@ -1,3 +1,6 @@
+# THIS STUFF IS SO OLD, DON'T LOOK AT IT.
+### Soon, I will delete this repository
+
 # pyPlots_v2
 ## Python scrips for creating various plots. 
 
