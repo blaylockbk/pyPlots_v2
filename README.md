@@ -1,5 +1,5 @@
 # THIS STUFF IS SO OLD, DON'T LOOK AT IT.
-### Best to scavage for parts
+### I keep it here so you and I can scavage for parts
 ![](https://github.com/blaylockbk/Ute_WRF/blob/master/rusty.jpg)
 
 # pyPlots_v2
